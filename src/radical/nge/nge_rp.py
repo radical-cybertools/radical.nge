@@ -8,7 +8,8 @@ import sys
 
 import radical.pilot as rp
 
-from .nge import NGE
+from .nge   import NGE
+from .utils import *
 
 
 # --------------------------------------------------------------------------
@@ -70,7 +71,7 @@ class NGE_RP(NGE):
 
         self._rep.header('request resources tasks\n')
         self._rep.info('\nrequesting backfill resources\n')
-        bf = rp.utils.get_backfill(partition, max_cores, max_walltime)
+        bf = get_backfill(partition, max_cores, max_walltime)
 
       # print 'bf list:'
       # import pprint
