@@ -3,18 +3,15 @@ __copyright__ = "Copyright 2013-2014, http://radical.rutgers.edu"
 __license__   = "MIT"
 
 
-import os
-import sys
-
 import radical.pilot as rp
 
 from .nge   import NGE
-from .utils import *
+from .utils import get_backfill
 
+MAX_CORES    = 160  # 10 nodes on titan
+MAX_WALLTIME =  60  #  1 hour == debug on titan
 
 # --------------------------------------------------------------------------
-#
-# see https://docs.google.com/document/d/1bm8ucgfi9SHjDy0w-ZX5NIdkjk87qFClMB9jMse75uM
 #
 class NGE_RP(NGE):
     '''
@@ -62,12 +59,17 @@ class NGE_RP(NGE):
     # --------------------------------------------------------------------------
     #
     def request_backfill_resources(self, request_stub, partition, 
-                                         max_cores, max_walltime):
+                                         policy=None):
         '''
-        request new backfill resources, chunked by the given max_cores and
+        Request new backfill resources, chunked by the given max_cores and
         max_walltime.  The given request_stub is used as template for the pilot
         descriptions.
         '''
+
+        if policy is None: policy = dict()
+
+        max_cores    = policy.get('max_cores'   , MAX_CORES   )
+        max_walltime = policy.get('max_walltime', MAX_WALLTIME)
 
         self._rep.header('request resources tasks\n')
         self._rep.info('\nrequesting backfill resources\n')
@@ -85,7 +87,7 @@ class NGE_RP(NGE):
                   'cores'   : cores, 
                   'runtime' : walltime
                  }
-            self._rep.ok('backfill  on %s [%5dcores * %4d min] @ %10s(%10s)]\n'%
+            self._rep.ok('backfill  on %s [%5dcores * %4dmin] @ %10s(%10s)]\n' %
                          (pd['resource'], pd['cores'], pd['runtime'],
                           pd['queue'], pd['project']))
           # pprint.pprint(pd)
@@ -113,7 +115,7 @@ class NGE_RP(NGE):
                     'cores'   : request['cores'],
                     'runtime' : request['walltime']
                   }
-            self._rep.ok('provision on %s [%5dcores * %4d min] @ %10s(%10s)]\n'%
+            self._rep.ok('provision on %s [%5dcores * %4dmin] @ %10s(%10s)]\n' %
                          (pd['resource'], pd['cores'], pd['runtime'],
                           pd['queue'], pd['project']))
             pds.append(rp.ComputePilotDescription(pd))

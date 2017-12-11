@@ -74,13 +74,13 @@ class NGE(object):
     # --------------------------------------------------------------------------
     #
     def request_backfill_resources(self, request_stub, partition=None,
-                                         max_cores=10*16, max_walltime=60):
+                                         policy=None):
         '''
         request resources as backfill jobs.
         '''
 
         return self._binding.request_backfill_resources(request_stub, partition,
-                                                        max_cores, max_walltime)
+                                                        policy)
 
 
     # --------------------------------------------------------------------------

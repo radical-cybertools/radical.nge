@@ -87,12 +87,11 @@ class NGE_RPS(NGE):
 
     # --------------------------------------------------------------------------
     #
-    def request_backfill_resources(self, request_stub, partition,
-                                         max_cores, max_walltime):
+    def request_backfill_resources(self, request_stub, partition, policy):
 
       # print 'put to /resources/backfill/%s/%s/%s/' % (partition, max_cores, max_walltime)
         return self._query('put', '/resources/backfill/%s/%s/%s/' % 
-                           (partition, max_cores, max_walltime), data=request_stub)
+                           (partition, policy), data=request_stub)
 
 
     # --------------------------------------------------------------------------

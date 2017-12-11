@@ -121,6 +121,7 @@ class NGE_Server(object):
             self._log.info('closed')
             return {"success" : True,
                     "result"  : None}
+        
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -154,6 +155,7 @@ class NGE_Server(object):
             ret = self._backend.uid
             return {"success" : True,
                     "result"  : ret}
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -163,16 +165,25 @@ class NGE_Server(object):
     # --------------------------------------------------------------------------
     #
     @methodroute('/resources/backfill/<partition>/<max_cores>/<max_walltime>/', method="PUT")
-    def request_backfill_resources(self, partition, max_cores, max_walltime):
+    def request_backfill_resources(self, partition, policy):
 
         request_stub = json.loads(bottle.request.body.read())
 
         try:
             self.check_cookie(bottle.request)
-            ret = self._backend.request_backfill_resources(request_stub, partition,
-                                                           max_cores, max_walltime)
+
+            if policy == 'default':
+                policy_dict = {'max_cores'    : 160,
+                               'max_walltime' :  30}
+            else:
+                raise ValueError('unknown policy [%s]', policy)
+                               
+            ret = self._backend.request_backfill_resources(request_stub,
+                                                           partition,
+                                                           policy_dict)
             return {"success" : True,
                     "result"  : ret}
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -191,6 +202,7 @@ class NGE_Server(object):
             ret = self._backend.request_resources(requests)
             return {"success" : True,
                     "result"  : ret}
+        
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -207,6 +219,7 @@ class NGE_Server(object):
             ret = self._backend.list_resources()
             return {"success" : True,
                     "result"  : ret}
+        
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -223,6 +236,7 @@ class NGE_Server(object):
             ret = self._backend.find_resources(states)
             return {"success" : True,
                     "result"  : ret}
+        
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -239,6 +253,7 @@ class NGE_Server(object):
             ret = self._backend.get_requested_resources()
             return {"success" : True,
                     "result"  : ret}
+        
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -255,6 +270,7 @@ class NGE_Server(object):
             ret = self._backend.get_available_resources()
             return {"success" : True,
                     "result"  : ret}
+        
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -271,6 +287,7 @@ class NGE_Server(object):
             ret = self._backend.get_resource_info(resource_ids)
             return {"success" : True,
                     "result"  : ret}
+        
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -287,6 +304,7 @@ class NGE_Server(object):
             ret = self._backend.get_resource_states(resource_ids)
             return {"success" : True,
                     "result"  : ret}
+        
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -303,6 +321,7 @@ class NGE_Server(object):
             ret = self._backend.wait_resource_states(resource_ids, states, timeout)
             return {"success" : True,
                     "result"  : ret}
+        
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -319,6 +338,7 @@ class NGE_Server(object):
             ret = self._backend.list_tasks()
             return {"success" : True,
                     "result"  : ret}
+        
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -337,6 +357,7 @@ class NGE_Server(object):
             ret = self._backend.submit_tasks(descriptions)
             return {"success" : True,
                     "result"  : ret}
+        
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -353,6 +374,7 @@ class NGE_Server(object):
             ret = self._backend.get_task_states(task_ids)
             return {"success" : True,
                     "result"  : ret}
+        
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -369,6 +391,7 @@ class NGE_Server(object):
             ret = self._backend.wait_task_states(task_ids, states, timeout)
             return {"success" : True,
                     "result"  : ret}
+        
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,

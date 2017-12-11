@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 
-import radical.utils as ru
 import radical.pilot as rp
 import radical.nge   as rn
 
-import sys
 import pprint
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 #
 if __name__ == '__main__':
 
@@ -25,18 +23,17 @@ if __name__ == '__main__':
                                             'queue'    : 'debug',
                                             'project'  : "CSC230"},
                                            partition='titan',
-                                           max_cores=30*5,
-                                           max_walltime=30))
+                                           policy='default'))
         print
-       
+
         print 'inspect resources'
         print nge.list_resources()
         print
-       
+
         print 'request resources'
         print nge.request_resources([{'resource' : 'ornl.titan_orte', 
                                             'queue'    : 'debug',
-                                            'cores'    : 16*5,
+                                            'cores'    : 160,
                                             'project'  : "CSC230",
                                             'walltime' : 20}])
         print

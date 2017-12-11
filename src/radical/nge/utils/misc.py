@@ -1,13 +1,24 @@
 
+__copyright__ = "Copyright 2013-2014, http://radical.rutgers.edu"
+__license__   = "MIT"
+
+
+import radical.utils as ru
+
+
 # ------------------------------------------------------------------------------
 #
-def get_backfill(partition=None, max_cores=16*10, max_walltime=60):
+def get_backfill(partition=None, max_cores=None, max_walltime=None):
     '''
-    return a set of [partition, cores walltime] tuples which fit into the current
-    backfill.  By default we split the backfillable cores into chunks of 10
-    nodes (where one node is used for the agent), and in walltimes of at most 60
-    min.
+    Return a set of [partition, cores walltime] tuples which fit into the
+    current backfill.  By default we split the backfillable cores into chunks of
+    10 nodes (where one node is used for the agent), and in walltimes of at most
+    60 min.
     '''
+
+    if max_cores    is None: max_cores    = 160
+    if max_walltime is None: max_walltime =  60
+
 
     # --------------------------------------------------------------------------
     def _duration_to_walltime(timestr):
@@ -20,7 +31,10 @@ def get_backfill(partition=None, max_cores=16*10, max_walltime=60):
                      00                 sec
                INFINITY
 
-        into a number of minutes.  `INFINITY` is mapped to `max_walltime`.
+        into a number of minutes. 
+
+        Any result larger than `max_walltime` is truncated to `max_walltime`.
+        `INFINITY` is also mapped to `max_walltime`.
         '''
         if timestr == 'INFINITY':
             return max_walltime
