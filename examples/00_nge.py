@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
         print 'request backfill resources'
         pprint.pprint(nge.request_backfill_resources(
-                                           {'resource' : 'ornl.titan_orte', 
+                                           {'resource' : 'ornl.titan_aprun', 
                                             'queue'    : 'debug',
                                             'project'  : "CSC230"},
                                            partition='titan',
