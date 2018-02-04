@@ -1,0 +1,6 @@
+
+{
+    "max_walltime" : 60,
+    "max_cores"    : 32
+}
+
