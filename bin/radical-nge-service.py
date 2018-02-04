@@ -4,13 +4,14 @@ __copyright__ = "Copyright 2017, http://radical.rutgers.edu"
 __license__   = "MIT"
 
 
-import radical.utils as ru
-import radical.nge   as rn
-
+import os
 import sys
 import json
 import pprint
 import bottle
+
+import radical.utils as ru
+import radical.nge   as rn
 
 ACCOUNTS = {'ruslan' : 'nalsur', 
             'andre'  : 'erdna', 
@@ -164,7 +165,7 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/backfill/<partition>/<max_cores>/<max_walltime>/', method="PUT")
+    @methodroute('/resources/backfill/<partition>/<policy>/', method="PUT")
     def request_backfill_resources(self, partition, policy):
 
         request_stub = json.loads(bottle.request.body.read())
@@ -172,19 +173,17 @@ class NGE_Server(object):
         try:
             self.check_cookie(bottle.request)
 
-            if policy == 'default':
-                policy_dict = {'max_cores'    : 160,
-                               'max_walltime' :  30}
-            else:
-                raise ValueError('unknown policy [%s]', policy)
-                               
+            PWD = os.path.dirname(rn.__file__)
+            print '%s/policies/%s.json' % (PWD, policy)
+            pol = ru.read_json('%s/policies/%s.json' % (PWD, policy))
+            print pol
             ret = self._backend.request_backfill_resources(request_stub,
-                                                           partition,
-                                                           policy_dict)
+                                                           partition, pol)
             return {"success" : True,
                     "result"  : ret}
 
         except Exception as e:
+            print e
             self._log.exception('oops')
             return {"success" : False,
                     'error'   : repr(e)}

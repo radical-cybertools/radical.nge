@@ -4,10 +4,13 @@ __license__   = "MIT"
 
 from .nge import NGE
 
+import os
 import json
 import time
 import pprint
 import requests
+
+import radical.utils as ru
 
 
 # --------------------------------------------------------------------------
@@ -89,8 +92,7 @@ class NGE_RPS(NGE):
     #
     def request_backfill_resources(self, request_stub, partition, policy):
 
-      # print 'put to /resources/backfill/%s/%s/%s/' % (partition, max_cores, max_walltime)
-        return self._query('put', '/resources/backfill/%s/%s/%s/' % 
+        return self._query('put', '/resources/backfill/%s/%s/' % 
                            (partition, policy), data=request_stub)
 
 

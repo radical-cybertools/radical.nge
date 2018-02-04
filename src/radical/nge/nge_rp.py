@@ -58,15 +58,12 @@ class NGE_RP(NGE):
 
     # --------------------------------------------------------------------------
     #
-    def request_backfill_resources(self, request_stub, partition, 
-                                         policy=None):
+    def request_backfill_resources(self, request_stub, partition, policy):
         '''
         Request new backfill resources, chunked by the given max_cores and
         max_walltime.  The given request_stub is used as template for the pilot
         descriptions.
         '''
-
-        if policy is None: policy = dict()
 
         max_cores    = policy.get('max_cores'   , MAX_CORES   )
         max_walltime = policy.get('max_walltime', MAX_WALLTIME)
