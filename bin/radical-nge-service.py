@@ -141,7 +141,7 @@ class NGE_Server(object):
     #
     def serve(self):
 
-        self._rep.info('serve on http://localhost:8080/\n\n')
+        self._rep.info('serve on http://localhost:8090/\n\n')
         bottle.run(host='localhost', port=8090, debug=False, quiet=True)
 
 
