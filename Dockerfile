@@ -18,12 +18,12 @@ WORKDIR /nge
 
 # Install base system and any needed packages
 RUN apt-get update && \
-    apt-get -y install gcc python python-pip
+    apt-get -y install gcc python python-pip git
 
 RUN gcc -v
 RUN python -V
 # RUN pip install --trusted-host pypi.python.org radical.nge
-RUN pip install git+https://github.com/radical-cybertools/radical.nge.git@devel
+RUN pip install "git+https://github.com/radical-cybertools/radical.nge.git@devel"
 
 # Run app.py when the container launches
 CMD ["radical-nge-service.py"]
