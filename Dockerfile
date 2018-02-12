@@ -1,30 +1,29 @@
 
 FROM ubuntu
 
-ENV DEBIAN_FRONTEND noninteractive
+# Define environment variables
+ENV DEBIAN_FRONTEND  noninteractive
+ENV RADICAL_VERBOSE  DEBUG
+ENV RADICAL_PROFILE  TRUE
+ENV RADICAL_NGE_HOST 0.0.0.0
+ENV RADICAL_NGE_PORT 8080
+
+
+# Make the port available to the world outside this container
+# FIXME: how to reference $RADICAL_NGE_PORT?
+EXPOSE 8080
+
+# Set the working directory
+WORKDIR /nge
+
+# Install base system and any needed packages
 RUN apt-get update && \
     apt-get -y install gcc python python-pip
 
-# # Use an official Python runtime as a parent image
-# FROM python:2.7-slim
-
-# Set the working directory to /app
-WORKDIR /nge
-
-# # Copy the current directory contents into the container at /app
-# ADD .. /nge
-
-# Install any needed packages specified in requirements.txt
 RUN gcc -v
 RUN python -V
-RUN pip install --trusted-host pypi.python.org radical.nge
-
-# Make port 80 available to the world outside this container
-EXPOSE 8090
-
-# Define environment variable
-ENV RADICAL_VERBOSE DEBUG
-ENV RADICAL_PROFILE TRUE
+# RUN pip install --trusted-host pypi.python.org radical.nge
+RUN pip install git+https://github.com/radical-cybertools/radical.nge.git@devel
 
 # Run app.py when the container launches
 CMD ["radical-nge-service.py"]
