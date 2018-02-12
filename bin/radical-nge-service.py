@@ -141,8 +141,11 @@ class NGE_Server(object):
     #
     def serve(self):
 
-        self._rep.info('serve on http://localhost:8090/\n\n')
-        bottle.run(host='localhost', port=8090, debug=False, quiet=True)
+        port = int(os.environ.get('RADICAL_NGE_PORT', 8080))
+        host = str(os.environ.get('RADICAL_NGE_HOST', '0.0.0.0'))
+
+        self._rep.info('serve on http://%s:%d/\n\n' % (host, port))
+        bottle.run(host=host, port=port, debug=False, quiet=True)
 
 
     # --------------------------------------------------------------------------
