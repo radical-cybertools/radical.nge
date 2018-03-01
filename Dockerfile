@@ -13,17 +13,16 @@ ENV RADICAL_NGE_PORT 8080
 # FIXME: how to reference $RADICAL_NGE_PORT?
 EXPOSE 8080
 
-# Set the working directory
-WORKDIR /nge
-
 # Install base system and any needed packages
 RUN apt-get update && \
-    apt-get -y install gcc python python-pip git
-
-RUN gcc -v
-RUN python -V
-# RUN pip install --trusted-host pypi.python.org radical.nge
+    apt-get -y install gcc python python-virtualenv python-pip git
 RUN pip install "git+https://github.com/radical-cybertools/radical.nge.git@devel"
+
+# force a user
+RUN     useradd -m radical
+USER    radical
+RUN     mkdir -p /home/radical/nge
+WORKDIR /home/radical/nge
 
 # Run app.py when the container launches
 CMD ["radical-nge-service.py"]
