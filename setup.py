@@ -268,6 +268,7 @@ setup_args = {
     'packages'           : find_packages('src'),
     'package_dir'        : {'': 'src'},
     'scripts'            : [
+                            'bin/radical-nge-service.sh',
                             'bin/radical-nge-service.py',
                            ],
     'package_data'       : {'': ['*.txt', '*.sh', '*.json', '*.gz', 'VERSION', 'SDIST', sdist_name]},
