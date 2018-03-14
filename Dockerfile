@@ -39,7 +39,7 @@ RUN     chmod -R a+rwX     /[^sp]*
 
 
 # Run app.py when the container launches
-CMD ["radical-nge-service.py"]
+CMD ["radical-nge-service.sh"]
 
 # ------------------------------------------------------------------------------
 
