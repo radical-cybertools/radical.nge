@@ -19,7 +19,6 @@ EXPOSE 8080
 # Install base system and any needed packages
 RUN apt-get update && \
     apt-get -y install gcc python python-virtualenv python-pip git
-RUN pip install "git+https://github.com/radical-cybertools/radical.nge.git@devel"
 
 
 # USER    radical  # this is ignored by openshift
@@ -34,11 +33,18 @@ RUN     mkdir -p         /home/radical/nge
 # RUN     chmod -R g+rwX   /var/log
 # RUN     chgrp -R 0       /etc
 # RUN     chmod -R g+rwX   /etc 
-RUN     chmod -R a+rwX     /[^sp]*
 
+RUN chmod -R a+rwX     /[^sp]*
+RUN git clone "https://github.com/radical-cybertools/radical.nge.git"; \
+    ls -la             ; \
+    cd radical.nge     ; \
+    ls -la             ; \
+    git checkout devel ; \
+    pip install .
 
 # Run app.py when the container launches
 CMD ["radical-nge-service.sh"]
+CMD ["/bin/bash"]
 
 # ------------------------------------------------------------------------------
 
