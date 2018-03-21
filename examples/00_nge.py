@@ -12,7 +12,7 @@ if __name__ == '__main__':
     nge = None
     try:
       # nge = rn.NGE(binding=rn.RP,  url=None)
-        nge = rn.NGE(binding=rn.RPS, url='http://localhost:8090/')
+        nge = rn.NGE(binding=rn.RPS, url='http://localhost:8080/')
 
         print nge.login (username='guest', password='guest')
         print 'session id: %s' % nge.uid

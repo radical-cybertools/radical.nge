@@ -141,8 +141,8 @@ class NGE_Server(object):
     #
     def serve(self):
 
-        for key in sorted(os.environ.keys):
-            print '%-20s: %s'  % (key, os.environ.get(key))
+      # for key in sorted(os.environ.keys()):
+      #     print '%-20s: %s'  % (key, os.environ.get(key))
 
         port = int(os.environ.get('RADICAL_NGE_PORT', 8080))
         host = str(os.environ.get('RADICAL_NGE_HOST', '0.0.0.0'))
