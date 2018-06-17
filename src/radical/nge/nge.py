@@ -73,6 +73,19 @@ class NGE(object):
 
     # --------------------------------------------------------------------------
     #
+    def restart(self):
+        '''
+        free all aquired and requested resources, cancel all non-final tasks,
+        then restart
+        '''
+
+        print '1: %s' % self._binding
+
+        return self._binding.restart()
+
+
+    # --------------------------------------------------------------------------
+    #
     def request_backfill_resources(self, request_stub, partition=None,
                                          policy=None):
         '''
@@ -177,6 +190,18 @@ class NGE(object):
         '''
 
         return self._binding.wait_resource_states(resource_ids, states, timeout)
+
+
+    # --------------------------------------------------------------------------
+    #
+    def cancel_resources(self, resource_ids=None):
+        '''
+        cancel all resources (ie. RP pilots) with the given UIDs (or for all
+        known resources if no UID is specified).  This call will return when the
+        resource states are final.
+        '''
+
+        return self._binding.cancel_resources(resource_ids)
 
 
     # --------------------------------------------------------------------------

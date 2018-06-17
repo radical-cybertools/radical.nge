@@ -36,6 +36,8 @@ class NGE_RPS(NGE):
     #
     def _query(self, mode, route, data=None):
 
+        print route, data
+
         if mode == 'get':
             r = requests.get(self._url + route, cookies=self._cookies)
 
@@ -44,7 +46,6 @@ class NGE_RPS(NGE):
 
         else:
             raise ValueError('invalid query mode %s' % mode)
-
 
         if r.cookies:
             assert(not self._cookies), 'we allow auth only once'
@@ -84,8 +85,14 @@ class NGE_RPS(NGE):
     #
     def close(self):
 
-        return
-      # return self._query('put', '/close/')
+        return self._query('put', '/close/')
+
+
+    # --------------------------------------------------------------------------
+    #
+    def restart(self):
+
+        return self._query('put', '/restart/')
 
 
     # --------------------------------------------------------------------------
@@ -209,6 +216,24 @@ class NGE_RPS(NGE):
 
     # --------------------------------------------------------------------------
     #
+    def cancel_resources(self, resource_ids=None):
+
+        # FIXME: this is state model agnostic - passed states will never be
+        #        matched
+        if not resource_ids:
+            resource_ids = self.list_resources()
+        elif not isinstance(resource_ids, list):
+            resource_ids = [resource_ids]
+
+        for rid in resource_ids:
+
+            self._query('get', '/resources/%s/cancel' % (rid))
+
+        return
+
+
+    # --------------------------------------------------------------------------
+    #
     def submit_tasks(self, descriptions):
 
         if   not descriptions                  : descriptions = list()
@@ -228,16 +253,17 @@ class NGE_RPS(NGE):
     #
     def get_task_states(self, task_ids=None):
 
-        if not task_ids:
-            task_ids = self.list_tasks()
-        elif not isinstance(task_ids, list):
-            task_ids = [task_ids]
+        if task_ids:
 
-        ret = list()
-        for tid in task_ids:
+            if not isinstance(task_ids, list):
+                task_ids = [task_ids]
 
-            state = self._query('get', '/tasks/%s/state' % tid)
-            ret.append(state)
+            ret = list()
+            for tid in task_ids:
+                state = self._query('get', '/tasks/%s/state' % tid)
+                ret.append(state)
+        else:
+            ret = self._query('get', '/tasks/state')
 
         return ret
 
@@ -246,22 +272,26 @@ class NGE_RPS(NGE):
     #
     def wait_task_states(self, task_ids=None, states=None, timeout=None):
 
-        if not isinstance(states, list): states = [states]
+        if not states:
+            state = ''
+
         else:
-            pass
-          # raise NotImplementedError('can only wait for one state')
+            if not isinstance(states, list): states = [states]
+            else:
+                pass  # raise NotImplementedError('can only wait for one state')
+            state = states[0]
 
-        state = states[0]
+        if not timeout:
+            # FIXME: we should do those conversions in `self._query`
+            timeout = '0'
 
-        # FIXME: this is state model agnostic - passed states will never be
-        #        matched
-        if not task_ids:
-            task_ids = self.list_tasks()
-        elif not isinstance(task_ids, list):
-            task_ids = [task_ids]
-
-        for rid in task_ids:
-            self._query('get', '/tasks/%s/wait/%s/%s' % (rid, state, timeout))
+        if task_ids:
+            if not isinstance(task_ids, list):
+                task_ids = [task_ids]
+            for tid in task_ids:
+                self._query('get', '/tasks/%s/wait/%s/%s' % (tid, state, timeout))
+        else:
+            self._query('get', '/tasks/wait/%s/%s' % (state, timeout))
 
         return
 

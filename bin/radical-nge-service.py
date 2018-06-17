@@ -5,17 +5,15 @@ __license__   = "MIT"
 
 
 import os
-import sys
 import json
-import pprint
 import bottle
 
 import radical.utils as ru
 import radical.nge   as rn
 
-ACCOUNTS = {'ruslan' : 'nalsur', 
-            'andre'  : 'erdna', 
-            'matteo' : 'eottam', 
+ACCOUNTS = {'ruslan' : 'nalsur',
+            'andre'  : 'erdna',
+            'matteo' : 'eottam',
             'guest'  : 'guest'}
 
 
@@ -29,6 +27,9 @@ def methodroute(route, **kwargs):
         return f
     return decorator
 
+
+# ------------------------------------------------------------------------------
+#
 def routeapp(obj):
     for kw in dir(obj):
         attr = getattr(obj, kw)
@@ -57,7 +58,6 @@ def routeapp(obj):
             bottle.route(attr.route, method, callback, name, aply, skip)(attr)
 
 
-
 # ------------------------------------------------------------------------------
 #
 class NGE_Server(object):
@@ -66,13 +66,32 @@ class NGE_Server(object):
     #
     def __init__(self):
 
-        self._log     = ru.get_logger('radical.pilot.nge')
-        self._rep     = ru.LogReporter(name='radical.pilot')
+        self._log     = ru.Logger('radical.pilot.nge')
+        self._rep     = ru.Reporter('radical.pilot.nge')
         self._rep.header('--- NGE (%s) ---' % rn.version)
+
+        self._start()
+
+
+    # --------------------------------------------------------------------------
+    #
+    def _start(self):
 
         self._backend = rn.NGE(binding=rn.RP, reporter=self._rep)
         self._closed  = False
         self._secret  = ru.generate_id('NGE', mode=ru.ID_UUID)
+
+
+    # --------------------------------------------------------------------------
+    #
+    def _stop(self):
+
+        if self._closed:
+            return
+
+        self._closed = True
+        self._backend.close()
+        self._log.info('closed')
 
 
     # --------------------------------------------------------------------------
@@ -89,7 +108,7 @@ class NGE_Server(object):
             if password != ACCOUNTS.get(username):
                 raise RuntimeError('invalid username/password - go away!')
 
-            bottle.response.set_cookie("account", username, 
+            bottle.response.set_cookie("account", username,
                                        secret=self._secret, path='/')
             return {"success" : True,
                     "result"  : username}
@@ -117,12 +136,29 @@ class NGE_Server(object):
 
         try:
             self._rep.header('Server terminates\n\n')
-            self._closed = True
-            self._backend.close()
-            self._log.info('closed')
+            self._stop()
             return {"success" : True,
                     "result"  : None}
-        
+
+        except Exception as e:
+            self._log.exception('oops')
+            return {"success" : False,
+                    "error"   : repr(e)}
+
+
+    # --------------------------------------------------------------------------
+    #
+    @methodroute('/restart/', method="PUT")
+    def restart(self):
+
+        try:
+            self._rep.header('Server restarts\n\n')
+            self._stop()
+            self._start()
+            self._log.info('restarted')
+            return {"success" : True,
+                    "result"  : None}
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -155,7 +191,6 @@ class NGE_Server(object):
     #
     @methodroute('/uid/', method="GET")
     def uid(self):
-
 
         try:
             self.check_cookie(bottle.request)
@@ -207,7 +242,7 @@ class NGE_Server(object):
             ret = self._backend.request_resources(requests)
             return {"success" : True,
                     "result"  : ret}
-        
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -224,7 +259,7 @@ class NGE_Server(object):
             ret = self._backend.list_resources()
             return {"success" : True,
                     "result"  : ret}
-        
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -241,7 +276,7 @@ class NGE_Server(object):
             ret = self._backend.find_resources(states)
             return {"success" : True,
                     "result"  : ret}
-        
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -258,7 +293,7 @@ class NGE_Server(object):
             ret = self._backend.get_requested_resources()
             return {"success" : True,
                     "result"  : ret}
-        
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -275,7 +310,7 @@ class NGE_Server(object):
             ret = self._backend.get_available_resources()
             return {"success" : True,
                     "result"  : ret}
-        
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -292,7 +327,7 @@ class NGE_Server(object):
             ret = self._backend.get_resource_info(resource_ids)
             return {"success" : True,
                     "result"  : ret}
-        
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -309,7 +344,7 @@ class NGE_Server(object):
             ret = self._backend.get_resource_states(resource_ids)
             return {"success" : True,
                     "result"  : ret}
-        
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -326,7 +361,24 @@ class NGE_Server(object):
             ret = self._backend.wait_resource_states(resource_ids, states, timeout)
             return {"success" : True,
                     "result"  : ret}
-        
+
+        except Exception as e:
+            self._log.exception('oops')
+            return {"success" : False,
+                    'error'   : repr(e)}
+
+
+    # --------------------------------------------------------------------------
+    #
+    @methodroute('/resources/<resource_ids>/cancel', method="GET")
+    def cancel_resources(self, resource_ids):
+
+        try:
+            self.check_cookie(bottle.request)
+            ret = self._backend.cancel_resources(resource_ids)
+            return {"success" : True,
+                    "result"  : ret}
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -343,7 +395,7 @@ class NGE_Server(object):
             ret = self._backend.list_tasks()
             return {"success" : True,
                     "result"  : ret}
-        
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -362,7 +414,7 @@ class NGE_Server(object):
             ret = self._backend.submit_tasks(descriptions)
             return {"success" : True,
                     "result"  : ret}
-        
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -379,7 +431,24 @@ class NGE_Server(object):
             ret = self._backend.get_task_states(task_ids)
             return {"success" : True,
                     "result"  : ret}
-        
+
+        except Exception as e:
+            self._log.exception('oops')
+            return {"success" : False,
+                    'error'   : repr(e)}
+
+
+    # --------------------------------------------------------------------------
+    #
+    @methodroute('/tasks/state', method="GET")
+    def get_tasks_states(self):
+
+        try:
+            self.check_cookie(bottle.request)
+            ret = self._backend.get_task_states()
+            return {"success" : True,
+                    "result"  : ret}
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,
@@ -396,7 +465,26 @@ class NGE_Server(object):
             ret = self._backend.wait_task_states(task_ids, states, timeout)
             return {"success" : True,
                     "result"  : ret}
-        
+
+        except Exception as e:
+            self._log.exception('oops')
+            return {"success" : False,
+                    'error'   : repr(e)}
+
+
+    # --------------------------------------------------------------------------
+    #
+    @methodroute('/tasks/wait/<states>/<timeout>', method="GET")
+    def wait_tasks_states(self, states, timeout):
+
+        try:
+            self.check_cookie(bottle.request)
+            ret = self._backend.wait_task_states(task_ids=None,
+                                                 states=states,
+                                                 timeout=timeout)
+            return {"success" : True,
+                    "result"  : ret}
+
         except Exception as e:
             self._log.exception('oops')
             return {"success" : False,

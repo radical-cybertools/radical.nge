@@ -3,13 +3,17 @@ __copyright__ = "Copyright 2013-2014, http://radical.rutgers.edu"
 __license__   = "MIT"
 
 
+import time
+
 import radical.pilot as rp
 
 from .nge   import NGE
 from .utils import get_backfill
 
+
 MAX_CORES    = 160  # 10 nodes on titan
 MAX_WALLTIME =  60  #  1 hour == debug on titan
+
 
 # --------------------------------------------------------------------------
 #
@@ -25,13 +29,28 @@ class NGE_RP(NGE):
         url: contact point (unused)
         '''
 
-        self._url     = url
-        self._rep     = reporter
+        self._url = url
+        self._rep = reporter
+
+        self._start()
+
+
+    # --------------------------------------------------------------------------
+    #
+    def _start(self):
+
         self._session = rp.Session()
         self._pmgr    = rp.PilotManager(self._session)
         self._umgr    = rp.UnitManager(self._session)
 
         self._umgr.register_callback(self._unit_state_cb)
+
+
+    # --------------------------------------------------------------------------
+    #
+    def _stop(self):
+
+        self._session.close()
 
 
     # --------------------------------------------------------------------------
@@ -53,7 +72,16 @@ class NGE_RP(NGE):
     #
     def close(self):
 
-        self._session.close()
+        self._stop()
+
+
+    # --------------------------------------------------------------------------
+    #
+    def restart(self):
+
+        self._stop()
+        time.sleep(3)
+        self._start()
 
 
     # --------------------------------------------------------------------------
@@ -241,6 +269,25 @@ class NGE_RP(NGE):
 
     # --------------------------------------------------------------------------
     #
+    def cancel_resources(self, resource_ids=None):
+
+        self._rep.info('\ncancel resources query\n')
+        pilots = self._pmgr.get_pilots(resource_ids)
+
+        self._pmgr.cancel_pilots(resource_ids)
+        self._pmgr.wait_pilots  (resource_ids, rp.FINAL)
+
+        if   not pilots                  : pilots = list()
+        elif not isinstance(pilots, list): pilots = [pilots]
+
+        for pilot in pilots:
+            self._rep.ok('%s: %10s\n' % (pilot.uid, pilot.state))
+
+        return [pilot.state for pilot in pilots]
+
+
+    # --------------------------------------------------------------------------
+    #
     def submit_tasks(self, descriptions):
 
         # FIXME: we actually get PANDA task descriptions here, which we need to
@@ -296,8 +343,9 @@ class NGE_RP(NGE):
     #
     def get_task_states(self, task_ids=None):
 
-        if   not task_ids                  : task_ids = []
-        elif not isinstance(task_ids, list): task_ids = [task_ids]
+        if task_ids:
+            if not isinstance(task_ids, list):
+                task_ids = [task_ids]
 
         units = self._umgr.get_units(task_ids)
 
