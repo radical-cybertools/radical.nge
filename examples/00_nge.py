@@ -20,6 +20,7 @@ if __name__ == '__main__':
     try:
       # nge = rn.NGE(binding=rn.RP,  url=None)
         nge = rn.NGE(binding=rn.RPS, url='http://localhost:8080/')
+      # nge = rn.NGE(binding=rn.RPS, url='http://two.radical-project.org:8080/')
 
         times.append(time.time())
         nge.restart()
