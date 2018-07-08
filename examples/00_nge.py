@@ -44,14 +44,14 @@ if __name__ == '__main__':
       # print 'ok'
 
         print 'request resources'
-        print nge.request_resources([{'resource' : 'ornl.titan_orte',
-                                            'queue'    : 'debug',
-                                            'project'  : 'BIP149',
-                                            'cores'    : 160,
-                                            'walltime' : 20}])
-      # print nge.request_resources([{'resource' : 'local.localhost',
-      #                                     'cores'    : 160,
-      #                                     'walltime' : 20}])
+      # print nge.request_resources([{'resource' : 'ornl.titan_orte',
+      #                               'queue'    : 'debug',
+      #                               'project'  : 'BIP149',
+      #                               'cores'    : 160,
+      #                               'walltime' : 20}])
+        print nge.request_resources([{'resource' : 'local.localhost',
+                                      'cores'    : 160,
+                                      'walltime' : 20}])
         print 'ok'
         times.append(time.time())
 
@@ -78,7 +78,7 @@ if __name__ == '__main__':
 #       print 'get_resource_states'
 #       print nge.get_resource_states()
 #       print 'ok'
- 
+
         print 'wait_resource_states'
         print nge.wait_resource_states(states=rp.PMGR_ACTIVE)
         print 'ok'
@@ -92,9 +92,9 @@ if __name__ == '__main__':
                               'arguments'        : 'gromacs/gromacs.sh',
                               'input_staging'    : [{'source': 'client:///gromacs', 
                                                      'target': 'unit:///gromacs',
-                                                     'action': 'TARBALL'}],
+                                                     'action': rp.TARBALL}],
                               'cpu_processes'    : 1,
-                              'cpu_process_type' : 'fork'})
+                              'cpu_process_type' : 'fork',
                         })
         print nge.submit_tasks(tasks)
         print 'ok'

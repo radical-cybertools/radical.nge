@@ -50,7 +50,7 @@ class NGE_RP(NGE):
     #
     def _stop(self):
 
-        self._session.close()
+        self._session.close(download=True)
 
 
     # --------------------------------------------------------------------------
