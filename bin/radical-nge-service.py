@@ -180,7 +180,7 @@ class NGE_Server(object):
       # for key in sorted(os.environ.keys()):
       #     print '%-20s: %s'  % (key, os.environ.get(key))
 
-        port = int(os.environ.get('RADICAL_NGE_PORT', 8080))
+        port = int(os.environ.get('RADICAL_NGE_PORT', 8090))
         host = str(os.environ.get('RADICAL_NGE_HOST', '0.0.0.0'))
 
         self._rep.info('serve on http://%s:%d/\n\n' % (host, port))
