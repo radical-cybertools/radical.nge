@@ -84,7 +84,14 @@ if __name__ == '__main__':
         print 'submit a task'
         tasks = list()
         for _ in range(n):
-            tasks.append({'executable' : '/bin/true'})
+            tasks.append({  # 'executable'    : '/bin/true',
+                              'executable'    : '/bin/sh',
+                              'arguments'     : 'gromacs/gromacs.sh',
+                              'input_staging' : [{'source': 'client:///gromacs', 
+                                                  'target': 'unit:///gromacs',
+                                                  'action': 'TARBALL'}],
+                              'cpu_processes' : 1,
+                        })
         print nge.submit_tasks(tasks)
         print
         times.append(time.time())

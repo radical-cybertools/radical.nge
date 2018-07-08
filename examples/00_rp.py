@@ -38,7 +38,12 @@ if __name__ == '__main__':
         cuds = list()
         for i in range(0, n):
             cud = rp.ComputeUnitDescription()
-            cud.executable       = '/bin/true'
+          # cud.executable       = '/bin/true'
+            cud.executable       = '/bin/sh'
+            cud.arguments        = 'gromacs/gromacs.sh'
+            cud.input_staging    = [{'source': 'client:///gromacs', 
+                                     'target': 'unit:///gromacs',
+                                     'action': rp.TARBALL}]
             cud.cpu_processes    = 1
             cuds.append(cud)
         umgr.submit_units(cuds)
