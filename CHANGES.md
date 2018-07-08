@@ -5,6 +5,12 @@
     https://github.com/radical-cybertools/radical.nge/issues?q=is%3Aissue+is%3Aopen+
 
 
+0.50.0 Release                                                        2018-07-08
+--------------------------------------------------------------------------------
+
+  - add timing examples, gromacs test
+
+
 0.47.3 Release                                                        2018-05-04
 --------------------------------------------------------------------------------
 
