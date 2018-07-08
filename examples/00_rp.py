@@ -25,7 +25,14 @@ if __name__ == '__main__':
 
         times.append(time.time())
         times.append(time.time())
-        pd_init = {'resource'      : 'local.localhost',
+      # pd_init = {'resource'      : 'local.localhost',
+      #            'runtime'       : 20,
+      #            'exit_on_error' : True,
+      #            'cores'         : 160
+      #           }
+        pd_init = {'resource'      : 'ornl.titan_orte',
+                   'project'       : 'BIP149',
+                   'queue'         : 'debug',
                    'runtime'       : 20,
                    'exit_on_error' : True,
                    'cores'         : 160
@@ -33,6 +40,9 @@ if __name__ == '__main__':
         pdesc = rp.ComputePilotDescription(pd_init)
         pilot = pmgr.submit_pilots(pdesc)
         umgr.add_pilots(pilot)
+        times.append(time.time())
+
+        pmgr.wait_pilots(state=[rp.PMGR_ACTIVE])
         times.append(time.time())
 
         cuds = list()
@@ -63,7 +73,7 @@ if __name__ == '__main__':
     times.append(time.time())
     data = '%6d \t %s\n' % (n, ''.join(['\t%6.2f' % (t - times[0]) 
                                         for t in times]))
-    with open('nge.dat', 'a+') as fout:
+    with open('rp.dat', 'a+') as fout:
         print data
         fout.write(data)
 
