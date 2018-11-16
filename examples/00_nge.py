@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
     times = list()
     nge   = None
-    n     = 1
+    n     = 100
     if len(sys.argv) > 1:
         n = int(sys.argv[1])
 
@@ -23,7 +23,7 @@ if __name__ == '__main__':
       # nge = rn.NGE(binding=rn.RPS, url='http://two.radical-project.org:8080/')
 
         times.append(time.time())
-        nge.restart()
+      # nge.restart()
         times.append(time.time())
 
         print nge.login (username='guest', password='guest')
@@ -87,12 +87,12 @@ if __name__ == '__main__':
         print 'submit a task'
         tasks = list()
         for _ in range(n):
-            tasks.append({  # 'executable'       : '/bin/true',
-                              'executable'       : '/bin/sh',
-                              'arguments'        : 'gromacs/gromacs.sh',
-                              'input_staging'    : [{'source': 'client:///gromacs', 
-                                                     'target': 'unit:///gromacs',
-                                                     'action': rp.TARBALL}],
+            tasks.append({    'executable'       : '/bin/true',
+                            # 'executable'       : '/bin/sh',
+                            # 'arguments'        : 'gromacs/gromacs.sh',
+                            # 'input_staging'    : [{'source': 'client:///gromacs', 
+                            #                        'target': 'unit:///gromacs',
+                            #                        'action': rp.TARBALL}],
                               'cpu_processes'    : 1,
                               'cpu_process_type' : 'fork',
                         })
@@ -125,8 +125,8 @@ if __name__ == '__main__':
 
     finally:
         if nge:
-            print 'close panda-nge session'
-            nge.close()
+         #  print 'close panda-nge session'
+         #  nge.close()
             print 'ok'
 
     times.append(time.time())

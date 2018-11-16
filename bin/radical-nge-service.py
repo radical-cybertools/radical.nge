@@ -14,6 +14,8 @@ import radical.nge   as rn
 ACCOUNTS = {'ruslan' : 'nalsur',
             'andre'  : 'erdna',
             'matteo' : 'eottam',
+            'vivek'  : 'keviv', 
+            'daniel' : 'leinad', 
             'guest'  : 'guest'}
 
 
