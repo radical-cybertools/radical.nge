@@ -36,7 +36,7 @@ class NGE_RPS(NGE):
     #
     def _query(self, mode, route, data=None):
 
-        print route, data
+      # print route, data
 
         if mode == 'get':
             r = requests.get(self._url + route, cookies=self._cookies)
