@@ -217,16 +217,16 @@ class NGE_Server(object):
             self.check_cookie(bottle.request)
 
             PWD = os.path.dirname(rn.__file__)
-            print '%s/policies/%s.json' % (PWD, policy)
+          # print '%s/policies/%s.json' % (PWD, policy)
             pol = ru.read_json('%s/policies/%s.json' % (PWD, policy))
-            print pol
+          # print pol
             ret = self._backend.request_backfill_resources(request_stub,
                                                            partition, pol)
             return {"success" : True,
                     "result"  : ret}
 
         except Exception as e:
-            print e
+          # print e
             self._log.exception('oops')
             return {"success" : False,
                     'error'   : repr(e)}
