@@ -7,6 +7,12 @@ __license__   = "MIT"
 import os
 import json
 import bottle
+import apispec
+
+from   apispec.ext.bottle import BottlePlugin
+
+
+
 
 import radical.utils as ru
 import radical.nge   as rn
@@ -98,7 +104,15 @@ class NGE_Server(object):
     #
     @methodroute('/login/', method="PUT")
     def login(self):
-
+        '''
+        Authentication
+        ---
+        put:
+            responses:
+                200:
+            schema:
+                $ref: '#/definitions/Gist'
+        '''
         try:
             data = json.loads(bottle.request.body.read())
 
@@ -491,14 +505,36 @@ class NGE_Server(object):
                     'error'   : repr(e)}
 
 
+    # --------------------------------------------------------------------------
+    #
+    def apispec(self):
+
+        spec = apispec.APISpec(title='NGE',
+                               version='0.50',
+                               openapi_version='2.0',
+                               info={'description' :  'NGE'}, 
+                               plugins=[BottlePlugin()])
+        spec.add_path(view=self.login)
+
+        return spec
+
+
+
 # ------------------------------------------------------------------------------
 #
 if __name__ == '__main__':
+
 
     server = None
     try:
         server = NGE_Server()
         routeapp(server)
+
+        docs = server.apispec()
+        import pprint
+        pprint.pprint(docs.as_dict())
+        assert(False)
+
         server.serve()
     finally:
         if server:
