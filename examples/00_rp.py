@@ -30,7 +30,7 @@ if __name__ == '__main__':
       #            'exit_on_error' : True,
       #            'cores'         : 160
       #           }
-        pd_init = {'resource'      : 'ornl.titan_orte',
+        pd_init = {'resource'      : 'ornl.titan_aprun',
                    'project'       : 'BIP149',
                    'queue'         : 'debug',
                    'runtime'       : 20,
