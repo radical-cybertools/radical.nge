@@ -13,8 +13,8 @@ ts = list()
 #
 if __name__ == '__main__':
 
-    psize = 16 * 64
-    unum  = 1024 * 4
+    psize = 32  # 16   * 64
+    unum  = 32  # 1024 * 4
     cores = 4
     utime = 1     # min
 
@@ -34,6 +34,7 @@ if __name__ == '__main__':
         t0 = t
 
     nge   = None
+    n     = 100
     if len(sys.argv) > 1:
         unum = int(sys.argv[1])
 
@@ -45,7 +46,7 @@ if __name__ == '__main__':
         nge.restart()
         mark('s restart')
 
-        print nge.login (username='guest', password='guest')
+        nge.login(username='guest', password='guest')
         mark('s login')
         print 'session id: %s' % nge.uid
 
@@ -63,7 +64,7 @@ if __name__ == '__main__':
       # print 'ok'
 
         print 'request resources'
-        print nge.request_resources([{'resource' : 'ornl.titan_orte',
+        print nge.request_resources([{'resource' : 'ornl.titan_aprun',
                                       'queue'    : 'debug',
                                       'project'  : 'BIP149',
                                       'cores'    : psize + 16*1,  # add an agent node
@@ -148,8 +149,8 @@ if __name__ == '__main__':
 
     finally:
         if nge:
-            print 'close panda-nge session'
-            nge.close()
+         #  print 'close panda-nge session'
+         #  nge.close()
             print 'ok'
 
     mark('s close')

@@ -79,8 +79,6 @@ class NGE(object):
         then restart
         '''
 
-        print '1: %s' % self._binding
-
         return self._binding.restart()
 
 
