@@ -131,11 +131,9 @@ class NGE_Server(object):
                 secret = ru.generate_id('NGE', mode=ru.ID_UUID)
                 account['secret'] = secret
 
-            bottle.response.set_cookie("username", username)
-            bottle.response.set_cookie("secret",   username, secret=account['secret'])
-            print 1, bottle.response
-            print 1, account['secret']
-            print
+            secret = account['secret']
+            bottle.response.set_cookie("username", username, path='/')
+            bottle.response.set_cookie("secret",   username, path='/', secret=secret)
 
             # start session for this user
             self._start(account)
@@ -153,38 +151,21 @@ class NGE_Server(object):
     #
     def check_cookie(self, request):
 
-        try:
-            print 2
-            headers_string = ['%s: %s' % (h, request.headers.get(h)) for h in request.headers.keys()] 
-            cookies_string = ['%s: %s' % (h, request.cookies.get(h)) for h in request.cookies.keys()] 
-            print 'URL=%s, method=%s\nheaders:\n%s\ncookies:\n%s' % (request.url,
-                    request.method,
-                    '\n'.join(headers_string),
-                    '\n'.join(cookies_string))
-            username = request.get_cookie("username")
+        username = request.get_cookie("username")
 
-            if not username or username not in accounts:
-                raise RuntimeError('invalid AAA session')
+        if not username or username not in accounts:
+            raise RuntimeError('invalid AAA session')
 
-            print 21, username
-            print 22, accounts[username]
-            print 23, accounts[username]['secret']
-            check = request.get_cookie("secret", accounts[username]['secret'])
-            print 24, accounts[username]['secret']
-            print 35, check
+        secret = accounts[username]['secret']
+        check = request.get_cookie("secret", secret=secret)
 
-            if not check or check != username:
-                raise RuntimeError('invalid AAA session (%s != %s)' % (check, username))
+        if not check or check != username:
+            raise RuntimeError('invalid AAA session (%s != %s)' % (check, username))
 
-            account = accounts.get(username)
+        account = accounts.get(username)
 
-            if not account:
-                raise RuntimeError('bogus AAA session')
-
-        except Exception as e:
-            print '---'
-            ru.print_exception_trace(e)
-            raise
+        if not account:
+            raise RuntimeError('bogus AAA session')
 
         return account
 
