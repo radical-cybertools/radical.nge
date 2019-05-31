@@ -43,9 +43,6 @@ if __name__ == '__main__':
         nge = rn.NGE(binding=rn.RPS, url='http://localhost:8090/')
       # nge = rn.NGE(binding=rn.RPS, url='http://two.radical-project.org:8080/')
 
-        nge.restart()
-        mark('s restart')
-
         nge.login(username='guest', password='guest')
         mark('s login')
         print 'session id: %s' % nge.uid
@@ -108,11 +105,13 @@ if __name__ == '__main__':
         tasks = list()
         for _ in range(unum):
             tasks.append({  # 'executable'       : '/bin/true',
-                              'executable'       : '/bin/sh',
-                              'arguments'        : ['gromacs_canon/gromacs.sh', cores, utime],
-                              'input_staging'    : [{'source': 'file:///ccs/home/merzky1/radical/radical.nge/examples/gromacs.canon', 
-                                                     'target': 'unit:///gromacs_canon',
-                                                     'action': rp.TARBALL}],
+                            # 'executable'       : '/bin/sh',
+                              'executable'       : '/bin/sleep',
+                              'arguments'        : ['10'],
+                            # 'arguments'        : ['gromacs_canon/gromacs.sh', cores, utime],
+                            # 'input_staging'    : [{'source': 'file:///ccs/home/merzky1/radical/radical.nge/examples/gromacs.canon', 
+                            #                        'target': 'unit:///gromacs_canon',
+                            #                        'action': rp.TARBALL}],
                               'cpu_processes'    : 1,
                               'cpu_threads'      : cores,
                               'cpu_process_type' : rp.POSIX,

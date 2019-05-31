@@ -11,12 +11,10 @@ import bottle
 import radical.utils as ru
 import radical.nge   as rn
 
-ACCOUNTS = {'ruslan' : 'nalsur',
-            'andre'  : 'erdna',
-            'matteo' : 'eottam',
-            'vivek'  : 'keviv', 
-            'daniel' : 'leinad', 
-            'guest'  : 'guest'}
+accounts = {'andre'  : {'password': 'erdna' , 'session' : None,  'secret': None},
+            'matteo' : {'password': 'eottam', 'session' : None,  'secret': None},
+            'daniel' : {'password': 'leinad', 'session' : None,  'secret': None}, 
+            'guest'  : {'password': 'guest' , 'session' : None,  'secret': None}}
 
 
 # ------------------------------------------------------------------------------
@@ -68,31 +66,45 @@ class NGE_Server(object):
     #
     def __init__(self):
 
-        self._log     = ru.Logger('radical.pilot.nge')
-        self._rep     = ru.Reporter('radical.pilot.nge')
+        self._log     = ru.Logger('radical.nge', level='DEBUG')
+        self._rep     = ru.Reporter('radical.nge')
         self._rep.header('--- NGE (%s) ---' % rn.version)
 
-        self._start()
-
 
     # --------------------------------------------------------------------------
     #
-    def _start(self):
+    def _start(self, account):
 
-        self._backend = rn.NGE(binding=rn.RP, reporter=self._rep)
-        self._closed  = False
-        self._secret  = ru.generate_id('NGE', mode=ru.ID_UUID)
-
-
-    # --------------------------------------------------------------------------
-    #
-    def _stop(self):
-
-        if self._closed:
+        if account['session']:
+            # session is active
+            self._log.info('session is active')
             return
 
-        self._closed = True
-        self._backend.close()
+        username = None
+        for _username in accounts:
+            if accounts[_username]['secret'] == account['secret']:
+                username = _username
+                break
+
+        if not username:
+            raise RuntimeError('outdated username - go away!')
+
+        self._log.info('new session for %s', username)
+
+        account['session'] = rn.NGE(binding=rn.RP, reporter=self._rep)
+
+
+    # --------------------------------------------------------------------------
+    #
+    def _stop(self, account):
+
+        if not account['session']:
+            # session was closed (or never started)
+            self._log.info('session is closed')
+            return
+
+        acccount['session'].close()
+        acccount['session'] = None
         self._log.info('closed')
 
 
@@ -101,17 +113,33 @@ class NGE_Server(object):
     @methodroute('/login/', method="PUT")
     def login(self):
 
+        self._log.info('login')
         try:
             data = json.loads(bottle.request.body.read())
 
             username = data.get('username')
             password = data.get('password')
+            account  = accounts.get(username)
 
-            if password != ACCOUNTS.get(username):
+            self._log.info('login %s', username)
+
+            if not account or account['password'] != password:
                 raise RuntimeError('invalid username/password - go away!')
 
-            bottle.response.set_cookie("account", username,
-                                       secret=self._secret, path='/')
+            # create cookie secret
+            if not account['secret']:
+                secret = ru.generate_id('NGE', mode=ru.ID_UUID)
+                account['secret'] = secret
+
+            bottle.response.set_cookie("username", username)
+            bottle.response.set_cookie("secret",   username, secret=account['secret'])
+            print 1, bottle.response
+            print 1, account['secret']
+            print
+
+            # start session for this user
+            self._start(account)
+
             return {"success" : True,
                     "result"  : username}
 
@@ -125,10 +153,40 @@ class NGE_Server(object):
     #
     def check_cookie(self, request):
 
-        username = request.get_cookie("account", secret=self._secret)
+        try:
+            print 2
+            headers_string = ['%s: %s' % (h, request.headers.get(h)) for h in request.headers.keys()] 
+            cookies_string = ['%s: %s' % (h, request.cookies.get(h)) for h in request.cookies.keys()] 
+            print 'URL=%s, method=%s\nheaders:\n%s\ncookies:\n%s' % (request.url,
+                    request.method,
+                    '\n'.join(headers_string),
+                    '\n'.join(cookies_string))
+            username = request.get_cookie("username")
 
-        if not username:
-            raise RuntimeError('invalid AAA session')
+            if not username or username not in accounts:
+                raise RuntimeError('invalid AAA session')
+
+            print 21, username
+            print 22, accounts[username]
+            print 23, accounts[username]['secret']
+            check = request.get_cookie("secret", accounts[username]['secret'])
+            print 24, accounts[username]['secret']
+            print 35, check
+
+            if not check or check != username:
+                raise RuntimeError('invalid AAA session (%s != %s)' % (check, username))
+
+            account = accounts.get(username)
+
+            if not account:
+                raise RuntimeError('bogus AAA session')
+
+        except Exception as e:
+            print '---'
+            ru.print_exception_trace(e)
+            raise
+
+        return account
 
 
     # --------------------------------------------------------------------------
@@ -137,8 +195,10 @@ class NGE_Server(object):
     def close(self):
 
         try:
+            account = self.check_cookie(bottle.request)
+
             self._rep.header('Server terminates\n\n')
-            self._stop()
+            self._stop(account)
             return {"success" : True,
                     "result"  : None}
 
@@ -154,9 +214,11 @@ class NGE_Server(object):
     def restart(self):
 
         try:
+            account = self.check_cookie(bottle.request)
+
             self._rep.header('Server restarts\n\n')
-            self._stop()
-            self._start()
+            self._stop(account)
+            self._start(account)
             self._log.info('restarted')
             return {"success" : True,
                     "result"  : None}
@@ -167,14 +229,14 @@ class NGE_Server(object):
                     "error"   : repr(e)}
 
 
-    # --------------------------------------------------------------------------
-    #
-    def _is_alive(self):
-
-        if self._closed:
-            raise RuntimeError('session closed')
-
-
+  # # --------------------------------------------------------------------------
+  # #
+  # def _is_alive(self):
+  #
+  #     if self._closed:
+  #         raise RuntimeError('session closed')
+  #
+  #
     # --------------------------------------------------------------------------
     #
     def serve(self):
@@ -195,10 +257,10 @@ class NGE_Server(object):
     def uid(self):
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.uid
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].uid
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -214,16 +276,16 @@ class NGE_Server(object):
         request_stub = json.loads(bottle.request.body.read())
 
         try:
-            self.check_cookie(bottle.request)
+            account = self.check_cookie(bottle.request)
 
             PWD = os.path.dirname(rn.__file__)
           # print '%s/policies/%s.json' % (PWD, policy)
             pol = ru.read_json('%s/policies/%s.json' % (PWD, policy))
           # print pol
-            ret = self._backend.request_backfill_resources(request_stub,
+            retval  = account['session'].request_backfill_resources(request_stub,
                                                            partition, pol)
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
           # print e
@@ -240,10 +302,10 @@ class NGE_Server(object):
         requests = json.loads(bottle.request.body.read())
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.request_resources(requests)
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].request_resources(requests)
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -257,10 +319,10 @@ class NGE_Server(object):
     def list_resources(self):
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.list_resources()
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].list_resources()
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -274,10 +336,10 @@ class NGE_Server(object):
     def find_resources(self, states=None):
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.find_resources(states)
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].find_resources(states)
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -291,10 +353,10 @@ class NGE_Server(object):
     def get_requested_resources(self):
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.get_requested_resources()
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].get_requested_resources()
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -308,10 +370,10 @@ class NGE_Server(object):
     def get_available_resources(self):
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.get_available_resources()
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].get_available_resources()
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -325,10 +387,10 @@ class NGE_Server(object):
     def get_resource_info(self, resource_ids):
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.get_resource_info(resource_ids)
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].get_resource_info(resource_ids)
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -342,10 +404,10 @@ class NGE_Server(object):
     def get_resource_states(self, resource_ids):
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.get_resource_states(resource_ids)
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].get_resource_states(resource_ids)
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -359,10 +421,10 @@ class NGE_Server(object):
     def wait_resource_states(self, resource_ids, states, timeout):
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.wait_resource_states(resource_ids, states, timeout)
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].wait_resource_states(resource_ids, states, timeout)
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -376,10 +438,10 @@ class NGE_Server(object):
     def cancel_resources(self, resource_ids):
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.cancel_resources(resource_ids)
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].cancel_resources(resource_ids)
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -393,10 +455,10 @@ class NGE_Server(object):
     def list_tasks(self):
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.list_tasks()
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].list_tasks()
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -412,10 +474,10 @@ class NGE_Server(object):
         descriptions = json.loads(bottle.request.body.read())
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.submit_tasks(descriptions)
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].submit_tasks(descriptions)
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -429,10 +491,10 @@ class NGE_Server(object):
     def get_task_states(self, task_ids):
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.get_task_states(task_ids)
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].get_task_states(task_ids)
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -446,10 +508,10 @@ class NGE_Server(object):
     def get_tasks_states(self):
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.get_task_states()
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].get_task_states()
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -463,10 +525,10 @@ class NGE_Server(object):
     def wait_task_states(self, task_ids, states, timeout):
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.wait_task_states(task_ids, states, timeout)
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].wait_task_states(task_ids, states, timeout)
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -480,12 +542,12 @@ class NGE_Server(object):
     def wait_tasks_states(self, states, timeout):
 
         try:
-            self.check_cookie(bottle.request)
-            ret = self._backend.wait_task_states(task_ids=None,
-                                                 states=states,
-                                                 timeout=timeout)
+            account = self.check_cookie(bottle.request)
+            retval  = account['session'].wait_task_states(task_ids=None,
+                                                          states=states,
+                                                          timeout=timeout)
             return {"success" : True,
-                    "result"  : ret}
+                    "result"  : retval}
 
         except Exception as e:
             self._log.exception('oops')
@@ -502,6 +564,7 @@ if __name__ == '__main__':
         server = NGE_Server()
         routeapp(server)
         server.serve()
+
     finally:
         if server:
             server.close()
