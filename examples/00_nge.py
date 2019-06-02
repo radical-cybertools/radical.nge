@@ -9,6 +9,9 @@ import radical.nge   as rn
 t0 = time.time()
 ts = list()
 
+tgt = 'local'
+tgt = 'titan'
+
 # ------------------------------------------------------------------------------
 #
 if __name__ == '__main__':
@@ -61,14 +64,16 @@ if __name__ == '__main__':
       # print 'ok'
 
         print 'request resources'
-        print nge.request_resources([{'resource' : 'ornl.titan_aprun',
-                                      'queue'    : 'debug',
-                                      'project'  : 'BIP149',
-                                      'cores'    : psize + 16*1,  # add an agent node
-                                      'walltime' : 60}])
-      # print nge.request_resources([{'resource' : 'local.localhost',
-      #                               'cores'    : 160,
-      #                               'walltime' : 20}])
+        if tgt == 'titan':
+            print nge.request_resources([{'resource' : 'ornl.titan_aprun',
+                                          'queue'    : 'debug',
+                                          'project'  : 'BIP149',
+                                          'cores'    : psize + 16*1,  # agent node
+                                          'walltime' : 60}])
+        else:
+            print nge.request_resources([{'resource' : 'local.localhost',
+                                          'cores'    : 160,
+                                          'walltime' : 20}])
         print 'ok'
         mark('p submit')
 

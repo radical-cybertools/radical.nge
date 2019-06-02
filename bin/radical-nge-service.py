@@ -77,8 +77,9 @@ class NGE_Server(object):
 
         if account['session']:
             # session is active
-            self._log.info('session is active')
-            return
+            self._log.info('session is active - closing')
+            account['session'].close()
+            account['session'] = None
 
         username = None
         for _username in accounts:
