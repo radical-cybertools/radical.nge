@@ -63,12 +63,12 @@ class NGE(object):
 
     # --------------------------------------------------------------------------
     #
-    def close(self):
+    def logout(self):
         '''
         free all aquired and requested resources, cancel all non-final tasks.
         '''
 
-        return self._binding.close()
+        return self._binding.logout()
 
 
     # --------------------------------------------------------------------------

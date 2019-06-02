@@ -9,8 +9,13 @@ import radical.nge   as rn
 t0 = time.time()
 ts = list()
 
-tgt = 'local'
-tgt = 'titan'
+
+if len(sys.argv) > 1:
+    tgt = sys.argv[1]
+else:
+    tgt = 'titan'
+
+
 
 # ------------------------------------------------------------------------------
 #
@@ -27,19 +32,17 @@ if __name__ == '__main__':
     ts.append('%10s: %8d' % ('utime', utime))
 
 
-    def mark(m):
+    def mark(e, m):
         global t0
         t = time.time()
         diff = t - t0
-        out  = '%10s: %6.2f' % (m, diff)
+        out  = '%-8s %-10s: %6.2f' % (e, m, diff)
         ts.append(out)
         print out
         t0 = t
 
     nge   = None
     n     = 100
-    if len(sys.argv) > 1:
-        unum = int(sys.argv[1])
 
     try:
       # nge = rn.NGE(binding=rn.RP,  url=None)
@@ -47,7 +50,7 @@ if __name__ == '__main__':
       # nge = rn.NGE(binding=rn.RPS, url='http://two.radical-project.org:8080/')
 
         nge.login(username='guest', password='guest')
-        mark('s login')
+        mark('session', 'login')
         print 'session id: %s' % nge.uid
 
       # print 'request backfill resources'
@@ -75,7 +78,7 @@ if __name__ == '__main__':
                                           'cores'    : 160,
                                           'walltime' : 20}])
         print 'ok'
-        mark('p submit')
+        mark('pilot', 'submit')
 
 #       print 'inspect resources'
 #       print nge.list_resources()
@@ -104,7 +107,7 @@ if __name__ == '__main__':
         print 'wait_resource_states'
         print nge.wait_resource_states(states=rp.PMGR_ACTIVE)
         print 'ok'
-        mark('p wait')
+        mark('pilot', 'wait')
 
         print 'submit a task'
         tasks = list()
@@ -125,7 +128,7 @@ if __name__ == '__main__':
                         })
         print nge.submit_tasks(tasks)
         print 'ok'
-        mark('u submit')
+        mark('unit', 'submit')
 
 #       print 'list tasks'
 #       print nge.list_tasks()
@@ -138,26 +141,28 @@ if __name__ == '__main__':
         print 'wait for task completion'
         print nge.wait_task_states(states=rp.FINAL)
         print 'ok'
-        mark('u wait')
+        mark('unit', 'wait')
 
         print 'get task states'
         print nge.get_task_states()
         print 'ok'
-        mark('u get')
+        mark('unit', 'get')
 
         print 'cancel resources'
         print nge.cancel_resources()
         print 'ok'
-        mark('p cancel')
+        mark('pilot', 'cancel')
 
 
     finally:
         if nge:
-         #  print 'close panda-nge session'
-         #  nge.close()
+            print 'logout'
+            nge.logout()
             print 'ok'
 
-    mark('s close')
+    mark('session', 'logout')
+    print
+
     ts.append('')
     with open('nge.dat', 'a+') as fout:
         for t in ts:

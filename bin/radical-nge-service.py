@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-__copyright__ = "Copyright 2017, http://radical.rutgers.edu"
-__license__   = "MIT"
+__copyright__ = 'Copyright 2017, http://radical.rutgers.edu'
+__license__   = 'MIT'
 
 
 import os
@@ -10,12 +10,6 @@ import bottle
 
 import radical.utils as ru
 import radical.nge   as rn
-
-accounts = {'andre'  : {'password': 'erdna' , 'session' : None,  'secret': None},
-            'matteo' : {'password': 'eottam', 'session' : None,  'secret': None},
-            'daniel' : {'password': 'leinad', 'session' : None,  'secret': None}, 
-            'guest'  : {'password': 'guest' , 'session' : None,  'secret': None}}
-
 
 # ------------------------------------------------------------------------------
 # https://stackoverflow.com/questions/8725605/
@@ -33,25 +27,25 @@ def methodroute(route, **kwargs):
 def routeapp(obj):
     for kw in dir(obj):
         attr = getattr(obj, kw)
-        if hasattr(attr, "route"):
-            if hasattr(attr, "method"):
-                method = getattr(attr, "method")
+        if hasattr(attr, 'route'):
+            if hasattr(attr, 'method'):
+                method = getattr(attr, 'method')
             else:
-                method = "GET"
-            if hasattr(attr, "callback"):
-                callback = getattr(attr, "callback")
+                method = 'GET'
+            if hasattr(attr, 'callback'):
+                callback = getattr(attr, 'callback')
             else:
                 callback = None
-            if hasattr(attr, "name"):
-                name = getattr(attr, "name")
+            if hasattr(attr, 'name'):
+                name = getattr(attr, 'name')
             else:
                 name = None
-            if hasattr(attr, "apply"):
-                aply = getattr(attr, "apply")
+            if hasattr(attr, 'apply'):
+                aply = getattr(attr, 'apply')
             else:
                 aply = None
-            if hasattr(attr, "skip"):
-                skip = getattr(attr, "skip")
+            if hasattr(attr, 'skip'):
+                skip = getattr(attr, 'skip')
             else:
                 skip = None
 
@@ -66,52 +60,65 @@ class NGE_Server(object):
     #
     def __init__(self):
 
-        self._log     = ru.Logger('radical.nge', level='DEBUG')
-        self._rep     = ru.Reporter('radical.nge')
+        self._log      = ru.Logger('radical.nge')
+        self._rep      = ru.Reporter('radical.nge')
+        self._accounts = [{'username': 'andre' , 'password': 'erdna' },
+                          {'username': 'matteo', 'password': 'eottam'},
+                          {'username': 'daniel', 'password': 'leinad'}, 
+                          {'username': 'guest' , 'password': 'guest' },
+                         ]
+        self._index    = {a['username'] : n for n,a
+                                            in  enumerate(self._accounts)}
+
+        # ensure that account names are unique
+        assert(len(self._accounts) == len(self._index))
+
         self._rep.header('--- NGE (%s) ---' % rn.version)
 
 
     # --------------------------------------------------------------------------
     #
-    def _start(self, account):
+    def _get_account(self, username):
 
-        if account['session']:
-            # session is active
-            self._log.info('session is active - closing')
-            account['session'].close()
-            account['session'] = None
+        if not username in self._index:
+            raise ValueError('invalid username [%s]' % username)
 
-        username = None
-        for _username in accounts:
-            if accounts[_username]['secret'] == account['secret']:
-                username = _username
-                break
+        return self._accounts[self._index[username]]
 
-        if not username:
-            raise RuntimeError('outdated username - go away!')
 
-        self._log.info('new session for %s', username)
+    # --------------------------------------------------------------------------
+    #
+    def terminate(self):
+
+        # close all open sessions
+        for account in self._accounts:
+            try:
+                self._stop_session(account)
+            except:
+                pass
+
+    # --------------------------------------------------------------------------
+    #
+    def _start_session(self, account):
+
+        # make sure any old session (if itexists) is properly stopped
+        self._stop_session(account)
 
         account['session'] = rn.NGE(binding=rn.RP, reporter=self._rep)
 
 
     # --------------------------------------------------------------------------
     #
-    def _stop(self, account):
+    def _stop_session(self, account):
 
-        if not account['session']:
-            # session was closed (or never started)
-            self._log.info('session is closed')
-            return
-
-        acccount['session'].close()
-        acccount['session'] = None
-        self._log.info('closed')
+        if account.get('session'):
+            account['session'].logout()
+            account['session'] = None
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/login/', method="PUT")
+    @methodroute('/login/', method='PUT')
     def login(self):
 
         self._log.info('login')
@@ -120,105 +127,92 @@ class NGE_Server(object):
 
             username = data.get('username')
             password = data.get('password')
-            account  = accounts.get(username)
+            account  = self._get_account(username)
 
             self._log.info('login %s', username)
 
-            if not account or account['password'] != password:
-                raise RuntimeError('invalid username/password - go away!')
+            if account['password'] != password:
+                raise RuntimeError('invalid password')
 
-            # create cookie secret
-            if not account['secret']:
-                secret = ru.generate_id('NGE', mode=ru.ID_UUID)
-                account['secret'] = secret
+            # create a new cookie secret
+            secret = ru.generate_id('NGE', mode=ru.ID_UUID)
+            account['secret'] = secret
 
-            secret = account['secret']
-            bottle.response.set_cookie("username", username, path='/')
-            bottle.response.set_cookie("secret",   username, path='/', secret=secret)
+            bottle.response.set_cookie('username', username, path='/')
+            bottle.response.set_cookie('secret',   username, path='/', secret=secret)
 
             # start session for this user
-            self._start(account)
+            self._start_session(account)
 
-            return {"success" : True,
-                    "result"  : username}
+            return {'success' : True,
+                    'result'  : username}
 
         except Exception as e:
-            self._log.exception('unknown user')
-            return {"success" : False,
-                    "error"   : repr(e)}
+            self._log.exception('login failed')
+            return {'success' : False,
+                    'error'   : repr(e)}
+
+
+    # --------------------------------------------------------------------------
+    #
+    @methodroute('/logout/', method='PUT')
+    def logout(self):
+
+        try:
+            account = self.check_cookie(bottle.request)
+
+            self._log.info('logout %s', account['username'])
+
+            # close session for this user
+            self._stop_session(account)
+
+            return {'success' : True,
+                    'result'  : None}
+
+        except Exception as e:
+            self._log.exception('logout failed')
+            return {'success' : False,
+                    'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
     def check_cookie(self, request):
 
-        username = request.get_cookie("username")
-
-        if not username or username not in accounts:
-            raise RuntimeError('invalid AAA session')
-
-        secret = accounts[username]['secret']
-        check = request.get_cookie("secret", secret=secret)
+        username = request.get_cookie('username')
+        account  = self._get_account(username)
+        secret   = account['secret']
+        check    = request.get_cookie('secret', secret=secret)
 
         if not check or check != username:
-            raise RuntimeError('invalid AAA session (%s != %s)' % (check, username))
+            raise RuntimeError('invalid session (%s != %s)' % (check, username))
 
-        account = accounts.get(username)
-
-        if not account:
-            raise RuntimeError('bogus AAA session')
+        account['username'] = username
 
         return account
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/close/', method="PUT")
-    def close(self):
-
-        try:
-            account = self.check_cookie(bottle.request)
-
-            self._rep.header('Server terminates\n\n')
-            self._stop(account)
-            return {"success" : True,
-                    "result"  : None}
-
-        except Exception as e:
-            self._log.exception('oops')
-            return {"success" : False,
-                    "error"   : repr(e)}
-
-
-    # --------------------------------------------------------------------------
-    #
-    @methodroute('/restart/', method="PUT")
+    @methodroute('/restart/', method='PUT')
     def restart(self):
 
         try:
             account = self.check_cookie(bottle.request)
 
             self._rep.header('Server restarts\n\n')
-            self._stop(account)
-            self._start(account)
+            self._stop_session(account)
+            self._start_session(account)
             self._log.info('restarted')
-            return {"success" : True,
-                    "result"  : None}
+            return {'success' : True,
+                    'result'  : None}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
-                    "error"   : repr(e)}
+            return {'success' : False,
+                    'error'   : repr(e)}
 
 
-  # # --------------------------------------------------------------------------
-  # #
-  # def _is_alive(self):
-  #
-  #     if self._closed:
-  #         raise RuntimeError('session closed')
-  #
-  #
     # --------------------------------------------------------------------------
     #
     def serve(self):
@@ -235,24 +229,24 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/uid/', method="GET")
+    @methodroute('/uid/', method='GET')
     def uid(self):
 
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].uid
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
-                    "error"   : repr(e)}
+            return {'success' : False,
+                    'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/backfill/<partition>/<policy>/', method="PUT")
+    @methodroute('/resources/backfill/<partition>/<policy>/', method='PUT')
     def request_backfill_resources(self, partition, policy):
 
         request_stub = json.loads(bottle.request.body.read())
@@ -266,19 +260,19 @@ class NGE_Server(object):
           # print pol
             retval  = account['session'].request_backfill_resources(request_stub,
                                                            partition, pol)
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
           # print e
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/', method="PUT")
+    @methodroute('/resources/', method='PUT')
     def request_resources(self):
 
         requests = json.loads(bottle.request.body.read())
@@ -286,171 +280,171 @@ class NGE_Server(object):
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].request_resources(requests)
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/', method="GET")
+    @methodroute('/resources/', method='GET')
     def list_resources(self):
 
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].list_resources()
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/<states>', method="GET")
+    @methodroute('/resources/<states>', method='GET')
     def find_resources(self, states=None):
 
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].find_resources(states)
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/requested', method="GET")
+    @methodroute('/resources/requested', method='GET')
     def get_requested_resources(self):
 
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].get_requested_resources()
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/available', method="GET")
+    @methodroute('/resources/available', method='GET')
     def get_available_resources(self):
 
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].get_available_resources()
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/<resource_ids>/info', method="GET")
+    @methodroute('/resources/<resource_ids>/info', method='GET')
     def get_resource_info(self, resource_ids):
 
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].get_resource_info(resource_ids)
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/<resource_ids>/state', method="GET")
+    @methodroute('/resources/<resource_ids>/state', method='GET')
     def get_resource_states(self, resource_ids):
 
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].get_resource_states(resource_ids)
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/<resource_ids>/wait/<states>/<timeout>', method="GET")
+    @methodroute('/resources/<resource_ids>/wait/<states>/<timeout>', method='GET')
     def wait_resource_states(self, resource_ids, states, timeout):
 
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].wait_resource_states(resource_ids, states, timeout)
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/<resource_ids>/cancel', method="GET")
+    @methodroute('/resources/<resource_ids>/cancel', method='GET')
     def cancel_resources(self, resource_ids):
 
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].cancel_resources(resource_ids)
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/tasks/', method="GET")
+    @methodroute('/tasks/', method='GET')
     def list_tasks(self):
 
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].list_tasks()
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/tasks/', method="PUT")
+    @methodroute('/tasks/', method='PUT')
     def submit_tasks(self):
 
         descriptions = json.loads(bottle.request.body.read())
@@ -458,69 +452,69 @@ class NGE_Server(object):
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].submit_tasks(descriptions)
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/tasks/<task_ids>/state', method="GET")
+    @methodroute('/tasks/<task_ids>/state', method='GET')
     def get_task_states(self, task_ids):
 
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].get_task_states(task_ids)
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/tasks/state', method="GET")
+    @methodroute('/tasks/state', method='GET')
     def get_tasks_states(self):
 
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].get_task_states()
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/tasks/<task_ids>/wait/<states>/<timeout>', method="GET")
+    @methodroute('/tasks/<task_ids>/wait/<states>/<timeout>', method='GET')
     def wait_task_states(self, task_ids, states, timeout):
 
         try:
             account = self.check_cookie(bottle.request)
             retval  = account['session'].wait_task_states(task_ids, states, timeout)
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/tasks/wait/<states>/<timeout>', method="GET")
+    @methodroute('/tasks/wait/<states>/<timeout>', method='GET')
     def wait_tasks_states(self, states, timeout):
 
         try:
@@ -528,12 +522,12 @@ class NGE_Server(object):
             retval  = account['session'].wait_task_states(task_ids=None,
                                                           states=states,
                                                           timeout=timeout)
-            return {"success" : True,
-                    "result"  : retval}
+            return {'success' : True,
+                    'result'  : retval}
 
         except Exception as e:
             self._log.exception('oops')
-            return {"success" : False,
+            return {'success' : False,
                     'error'   : repr(e)}
 
 
@@ -549,7 +543,7 @@ if __name__ == '__main__':
 
     finally:
         if server:
-            server.close()
+            server.terminate()
 
 
 # ------------------------------------------------------------------------------

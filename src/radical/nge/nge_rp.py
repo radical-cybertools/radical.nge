@@ -70,7 +70,7 @@ class NGE_RP(NGE):
 
     # --------------------------------------------------------------------------
     #
-    def close(self):
+    def logout(self):
 
         self._stop()
 
@@ -80,7 +80,6 @@ class NGE_RP(NGE):
     def restart(self):
 
         self._stop()
-        time.sleep(3)
         self._start()
 
 
