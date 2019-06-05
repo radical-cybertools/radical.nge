@@ -10,10 +10,8 @@ t0 = time.time()
 ts = list()
 
 
-if len(sys.argv) > 1:
-    tgt = sys.argv[1]
-else:
-    tgt = 'titan'
+tgt = 'local'
+tgt = 'titan'
 
 
 
@@ -21,14 +19,21 @@ else:
 #
 if __name__ == '__main__':
 
-    psize = 32  # 16   * 64
-    unum  = 32  # 1024 * 4
-    cores = 4
-    utime = 1     # min
+    if len(sys.argv) > 1:
+        n = int(sys.argv[1])
+    else:
+        n = 32
+
+    unum  = n
+    ugen  = 2    # generations
+    usize = 4    # threads
+    utime = 1    # sec
+    psize = int(n * usize / ugen)
 
     ts.append('%10s: %8d' % ('psize', psize))
     ts.append('%10s: %8d' % ('unum ', unum ))
-    ts.append('%10s: %8d' % ('cores', cores))
+    ts.append('%10s: %8d' % ('ugen ', ugen ))
+    ts.append('%10s: %8d' % ('usize', usize))
     ts.append('%10s: %8d' % ('utime', utime))
 
 
@@ -42,7 +47,6 @@ if __name__ == '__main__':
         t0 = t
 
     nge   = None
-    n     = 100
 
     try:
       # nge = rn.NGE(binding=rn.RP,  url=None)
@@ -71,7 +75,7 @@ if __name__ == '__main__':
             print nge.request_resources([{'resource' : 'ornl.titan_aprun',
                                           'queue'    : 'debug',
                                           'project'  : 'BIP149',
-                                          'cores'    : psize + 16*1,  # agent node
+                                          'cores'    : psize + 16*1,  # agent nodes
                                           'walltime' : 60}])
         else:
             print nge.request_resources([{'resource' : 'local.localhost',
@@ -112,19 +116,17 @@ if __name__ == '__main__':
         print 'submit a task'
         tasks = list()
         for _ in range(unum):
-            tasks.append({  # 'executable'       : '/bin/true',
-                            # 'executable'       : '/bin/sh',
-                              'executable'       : '/bin/sleep',
-                              'arguments'        : ['10'],
-                            # 'arguments'        : ['gromacs_canon/gromacs.sh', cores, utime],
-                            # 'input_staging'    : [{'source': 'file:///ccs/home/merzky1/radical/radical.nge/examples/gromacs.canon', 
-                            #                        'target': 'unit:///gromacs_canon',
-                            #                        'action': rp.TARBALL}],
-                              'cpu_processes'    : 1,
-                              'cpu_threads'      : cores,
-                              'cpu_process_type' : rp.POSIX,
-                              'cpu_thread_type'  : rp.POSIX,
-                              'cpu_process_type' : 'fork',
+            tasks.append({   'executable'       : '/bin/sleep',
+                             'arguments'        : [utime],
+                           # 'arguments'        : ['gromacs_canon/gromacs.sh', cores, utime],
+                           # 'input_staging'    : [{'source': 'file:///ccs/home/merzky1/radical/radical.nge/examples/gromacs.canon', 
+                           #                        'target': 'unit:///gromacs_canon',
+                           #                        'action': rp.TARBALL}],
+                             'cpu_processes'    : 1,
+                             'cpu_threads'      : usize,
+                             'cpu_process_type' : rp.POSIX,
+                             'cpu_thread_type'  : rp.POSIX,
+                             'cpu_process_type' : 'fork',
                         })
         print nge.submit_tasks(tasks)
         print 'ok'
