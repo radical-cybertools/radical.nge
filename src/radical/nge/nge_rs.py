@@ -2,8 +2,6 @@
 __copyright__ = "Copyright 2013-2014, http://radical.rutgers.edu"
 __license__   = "MIT"
 
-from .nge import NGE
-
 import os
 import json
 import time
@@ -15,37 +13,63 @@ import radical.utils as ru
 
 # --------------------------------------------------------------------------
 #
-# see https://docs.google.com/document/d/1bm8ucgfi9SHjDy0w-ZX5NIdkjk87qFClMB9jMse75uM
-#
-class NGE_RPS(NGE):
+class NGE_RS(object):
     '''
-    This is the RPS bound implementation of the abstract NGE class, which
-    queries a nge server instance via REST
+    This is class interfaces to the NGE service's REST API.
     '''
 
     # --------------------------------------------------------------------------
     #
-    def __init__(self, url, reporter=None):
+    def __init__(self, url, sid=None, log=None, rep=None, prof=None):
 
-        self._url     = url.strip('/')
-        self._rep     = reporter
-        self._cookies = list()
+        if log : self._log  = log
+        else   : self._log  = ru.Logger('radical.nge')
+
+        if rep : self._rep  = log
+        else   : self._rep  = ru.Reporter('radical.nge')
+
+        if prof: self._prof = prof
+        else   : self._prof = ru.Profiler('radical.nge')
+
+        self._cookies        = list()
+        self._url            = ru.Url(url)
+        self._qbase          = ru.Url(url)
+        self._qbase.username = ''
+        self._qbase.password = ''
+        self._qbase          = str(self._qbase)
+        self._qbase          = self._qbase.rstrip('/')
+
+        if self._url.username and self._url.password:
+            self.login(self._url.username, self._url.password)
+
+        if sid:
+            self.connect_session(sid)
 
 
     # --------------------------------------------------------------------------
     #
     def _query(self, mode, route, data=None):
 
-      # print route, data
+        url = self._qbase + route
+        print '---> %s' % url
+
+        self._log.debug('request %5s: %s [%s]', mode, route, data)
+        self._log.debug('request %5s: %s', mode, url)
 
         if mode == 'get':
-            r = requests.get(self._url + route, cookies=self._cookies)
+            r = requests.get(url, cookies=self._cookies)
 
         elif mode == 'put':
-            r = requests.put(self._url + route, cookies=self._cookies, json=data)
+            r = requests.put(url, cookies=self._cookies, json=data)
 
         else:
             raise ValueError('invalid query mode %s' % mode)
+
+        self._log.debug('reply   %3s: %s [%s]', r.status_code,
+                                                 len(r.content), r.content[:64])
+
+        if r.status_code != 200:
+            raise RuntimeError('query failed:\n %s' % r.content)
 
         if r.cookies:
             assert(not self._cookies), 'we allow auth only once'
@@ -57,47 +81,62 @@ class NGE_RPS(NGE):
         except ValueError as e:
             raise RuntimeError('query failed: %s' % repr(e))
 
-        if not result['success'] or r.status_code is not 200:
+        if not result['success']:
             raise RuntimeError('query failed: %s' % result['error'])
 
         return result['result']
 
 
-    # --------------------------------------------------------------------------
-    #
-    @property
-    def uid(self):
-
-        return self._query('get', '/uid/')
-
 
     # --------------------------------------------------------------------------
     #
     def login(self, username, password):
+        '''
+        login to the service with given username and password.  This method will
+        stor a cookie with a session secret so that future calls on this NGE
+        object instance use the same credentials.  Another call to `login` will
+        overwrite that cookie and use the new credentials.
+        '''
 
-        data = {'username' : username, 
-                'password' : password}
+        data = {'username' : self._url.username, 
+                'password' : self._url.password}
 
         return self._query('put', '/login/', data=data)
 
 
     # --------------------------------------------------------------------------
     #
-    def logout(self):
+    def session(self, sid=None):
+        '''
+        check if the named session exists.  If not, the session is created.
+        If sid is None, then no session is connected or created.
 
-        return self._query('put', '/logout/')
+        The method will return the sid of the currently active session
+        (or `None` if no session is active).
+        '''
+
+        data = {'sid': sid}
+
+        return self._query('put', '/session/', data=data)
 
 
     # --------------------------------------------------------------------------
     #
-    def restart(self):
+    def list_sessions(self):
+        '''
+        return all session IDs known for this user (irrespective of session
+        state)
+        '''
 
-        return self._query('put', '/restart/')
+        return self._query('get', '/sessions/')
 
 
     # --------------------------------------------------------------------------
     #
     def request_backfill_resources(self, request_stub, partition, policy):
+        '''
+        request resources as backfill jobs.
+        '''
 
         return self._query('put', '/resources/backfill/%s/%s/' % 
                            (partition, policy), data=request_stub)
@@ -106,6 +145,10 @@ class NGE_RPS(NGE):
     # --------------------------------------------------------------------------
     #
     def request_resources(self, requests):
+        '''
+        request a new resource (ie. submit a new RP pilot) for a given set of
+        cores / walltime.
+        '''
 
         if   not requests                  : requests = list()
         elif not isinstance(requests, list): requests = [requests]
@@ -116,6 +159,10 @@ class NGE_RPS(NGE):
     # --------------------------------------------------------------------------
     #
     def list_resources(self):
+        '''
+        return the UIDs for all known resources (ie. RP pilots), independent of
+        their state.
+        '''
 
         return self._query('get', '/resources/')
 
@@ -123,6 +170,10 @@ class NGE_RPS(NGE):
     # --------------------------------------------------------------------------
     #
     def find_resources(self, states=None):
+        '''
+        return the UIDs for all known resources (ie. RP pilots) in the given
+        states, or in any state if no state filter is defined.
+        '''
 
         if   not states                  : states = list()
         elif not isinstance(states, list): states = [states]
@@ -141,6 +192,10 @@ class NGE_RPS(NGE):
     # --------------------------------------------------------------------------
     #
     def get_resource_info(self, resource_ids=None):
+        '''
+        get information for all resources (ie. RP pilots) with the given UIDs
+        (or for all known resources if no UID is specified).
+        '''
 
         if not resource_ids:
             resource_ids = self.list_resources()
@@ -159,6 +214,10 @@ class NGE_RPS(NGE):
     # --------------------------------------------------------------------------
     #
     def get_requested_resources(self):
+        '''
+        find all resources (ie. pilots) in *any* state, and return number of
+        cores, walltime and state as tuples.
+        '''
 
         return self._query('get', '/resources/requested')
 
@@ -166,6 +225,10 @@ class NGE_RPS(NGE):
     # --------------------------------------------------------------------------
     #
     def get_available_resources(self):
+        '''
+        find all `ACTIVE` resources (ie. pilots) and return number of cores,
+        walltime and state as tuples.
+        '''
 
         return self._query('get', '/resources/available')
 
@@ -173,6 +236,10 @@ class NGE_RPS(NGE):
     # --------------------------------------------------------------------------
     #
     def get_resource_states(self, resource_ids=None):
+        '''
+        get the state for all resources (ie. RP pilots) with the given UIDs
+        (or for all known resources if no UID is specified).
+        '''
 
         if not resource_ids:
             resource_ids = self.list_resources()
@@ -192,6 +259,13 @@ class NGE_RPS(NGE):
     #
     def wait_resource_states(self, resource_ids=None, 
                              states=None, timeout=None):
+        '''
+        wait for a specific (set of) states for all resources (ie. RP pilots)
+        with the given UIDs (or for all known resources if no UID is specified).
+        This call will return after a given timeout, or after the states have
+        been reached, whichever occurs first.  A negative timeout value will
+        cause it to wait forever.
+        '''
 
         if not isinstance(states, list): states = [states]
         else:
@@ -217,6 +291,11 @@ class NGE_RPS(NGE):
     # --------------------------------------------------------------------------
     #
     def cancel_resources(self, resource_ids=None):
+        '''
+        cancel all resources (ie. RP pilots) with the given UIDs (or for all
+        known resources if no UID is specified).  This call will return when the
+        resource states are final.
+        '''
 
         # FIXME: this is state model agnostic - passed states will never be
         #        matched
@@ -235,6 +314,10 @@ class NGE_RPS(NGE):
     # --------------------------------------------------------------------------
     #
     def submit_tasks(self, descriptions):
+        '''
+        Harvester task descriptions are submitted to the RP level resources
+        (pilots).
+        '''
 
         if   not descriptions                  : descriptions = list()
         elif not isinstance(descriptions, list): descriptions = [descriptions]
@@ -245,6 +328,9 @@ class NGE_RPS(NGE):
     # --------------------------------------------------------------------------
     #
     def list_tasks(self):
+        '''
+        return UIDs for all known tasks (ie. RP units)
+        '''
 
         return self._query('get', '/tasks/')
 
@@ -252,6 +338,10 @@ class NGE_RPS(NGE):
     # --------------------------------------------------------------------------
     #
     def get_task_states(self, task_ids=None):
+        '''
+        return states for the tasks (ie. RP units) with the given UIDs, or for
+        all tasks, if no UIDs are specified
+        '''
 
         if task_ids:
 
@@ -271,6 +361,13 @@ class NGE_RPS(NGE):
     # --------------------------------------------------------------------------
     #
     def wait_task_states(self, task_ids=None, states=None, timeout=None):
+        '''
+        wait for a specific (set of) states for all tasks (ie. RP units)
+        with the given UIDs (or for all known tasks if no UID is specified).
+        This call will return after a given timeout, or after the states have
+        been reached, whichever occurs first.  A negative timeout value will
+        cause it to wait forever.
+        '''
 
         if not states:
             state = ''

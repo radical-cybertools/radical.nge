@@ -7,7 +7,6 @@ import time
 
 import radical.pilot as rp
 
-from .nge   import NGE
 from .utils import get_backfill
 
 
@@ -17,40 +16,29 @@ MAX_WALLTIME =  60  #  1 hour == debug on titan
 
 # --------------------------------------------------------------------------
 #
-class NGE_RP(NGE):
+class NGE_RP(object):
     '''
-    This is the RP bound implementation of the abstract NGE class/
+    This class interfaces from a NGE_RS like API to radical.pilot
     '''
 
     # --------------------------------------------------------------------------
     #
-    def __init__(self, url=None, reporter=None):
-        '''
-        url: contact point (unused)
-        '''
+    def __init__(self, log=None, rep=None, prof=None):
 
-        self._url = url
-        self._rep = reporter
+        if log : self._log  = log
+        else   : self._log  = ru.Logger('radical.nge')
 
-        self._start()
+        if rep : self._rep  = log
+        else   : self._rep  = ru.Reporter('radical.nge')
 
-
-    # --------------------------------------------------------------------------
-    #
-    def _start(self):
+        if prof: self._prof = prof
+        else   : self._prof = ru.Profiler('radical.nge')
 
         self._session = rp.Session()
         self._pmgr    = rp.PilotManager(self._session)
         self._umgr    = rp.UnitManager(self._session)
 
         self._umgr.register_callback(self._unit_state_cb)
-
-
-    # --------------------------------------------------------------------------
-    #
-    def _stop(self):
-
-        self._session.close(download=True)
 
 
     # --------------------------------------------------------------------------
@@ -63,24 +51,9 @@ class NGE_RP(NGE):
 
     # --------------------------------------------------------------------------
     #
-    def login(self, username, password):
+    def close(self):
 
-        raise NotImplementedError('RP does not implement AAA')
-
-
-    # --------------------------------------------------------------------------
-    #
-    def logout(self):
-
-        self._stop()
-
-
-    # --------------------------------------------------------------------------
-    #
-    def restart(self):
-
-        self._stop()
-        self._start()
+        self._session.close(download=True)
 
 
     # --------------------------------------------------------------------------
@@ -147,6 +120,8 @@ class NGE_RP(NGE):
         pilots = self._pmgr.submit_pilots(pds)
         self._umgr.add_pilots(pilots)
 
+        return [p.uid for p in pilots]
+
 
     # --------------------------------------------------------------------------
     #
@@ -154,6 +129,7 @@ class NGE_RP(NGE):
 
         self._rep.info('\nresource listing\n')
         [self._rep.ok('%s\n' % pilot.uid) for pilot in self._pmgr.get_pilots()]
+
         return [pilot.uid for pilot in self._pmgr.get_pilots()]
 
 

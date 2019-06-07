@@ -6,14 +6,8 @@ import time
 import radical.pilot as rp
 import radical.nge   as rn
 
-t0 = time.time()
-ts = list()
-
-
-tgt = 'local'
 tgt = 'titan'
-
-
+tgt = 'local'
 
 # ------------------------------------------------------------------------------
 #
@@ -30,32 +24,28 @@ if __name__ == '__main__':
     utime = 1    # sec
     psize = int(n * usize / ugen)
 
-    ts.append('%10s: %8d' % ('psize', psize))
-    ts.append('%10s: %8d' % ('unum ', unum ))
-    ts.append('%10s: %8d' % ('ugen ', ugen ))
-    ts.append('%10s: %8d' % ('usize', usize))
-    ts.append('%10s: %8d' % ('utime', utime))
-
-
-    def mark(e, m):
-        global t0
-        t = time.time()
-        diff = t - t0
-        out  = '%-8s %-10s: %6.2f' % (e, m, diff)
-        ts.append(out)
-        print out
-        t0 = t
-
-    nge   = None
+    nge = None
+    sid = None
+    url = 'http://guest:guest@localhost:8090/'
 
     try:
-      # nge = rn.NGE(binding=rn.RP,  url=None)
-        nge = rn.NGE(binding=rn.RPS, url='http://localhost:8090/')
-      # nge = rn.NGE(binding=rn.RPS, url='http://two.radical-project.org:8080/')
+        print 'connect'
+        nge = rn.NGE_RS(url=url, sid=sid)
 
-        nge.login(username='guest', password='guest')
-        mark('session', 'login')
-        print 'session id: %s' % nge.uid
+        print 'check_session'
+        sid = nge.session()
+        print 'sid: %s' % sid
+
+        print 'list_sessions'
+        print nge.list_sessions()
+        
+        sid = 'foo.1'
+        print 'start_session %s' % sid
+        nge.session(sid)
+
+        print 'check_session'
+        print 'sid: %s' % nge.session()
+
 
       # print 'request backfill resources'
       # pprint.pprint(nge.request_backfill_resources(
@@ -82,7 +72,6 @@ if __name__ == '__main__':
                                           'cores'    : 160,
                                           'walltime' : 20}])
         print 'ok'
-        mark('pilot', 'submit')
 
 #       print 'inspect resources'
 #       print nge.list_resources()
@@ -111,7 +100,6 @@ if __name__ == '__main__':
         print 'wait_resource_states'
         print nge.wait_resource_states(states=rp.PMGR_ACTIVE)
         print 'ok'
-        mark('pilot', 'wait')
 
         print 'submit a task'
         tasks = list()
@@ -130,7 +118,6 @@ if __name__ == '__main__':
                         })
         print nge.submit_tasks(tasks)
         print 'ok'
-        mark('unit', 'submit')
 
 #       print 'list tasks'
 #       print nge.list_tasks()
@@ -143,33 +130,24 @@ if __name__ == '__main__':
         print 'wait for task completion'
         print nge.wait_task_states(states=rp.FINAL)
         print 'ok'
-        mark('unit', 'wait')
 
         print 'get task states'
         print nge.get_task_states()
         print 'ok'
-        mark('unit', 'get')
 
         print 'cancel resources'
         print nge.cancel_resources()
         print 'ok'
-        mark('pilot', 'cancel')
 
 
     finally:
         if nge:
-            print 'logout'
-            nge.logout()
-            print 'ok'
+            pass
+          # print 'logout'
+          # nge.logout()
+          # print 'ok'
+          # raise
 
-    mark('session', 'logout')
-    print
-
-    ts.append('')
-    with open('nge.dat', 'a+') as fout:
-        for t in ts:
-            print t
-            fout.write(t)
 
 # ------------------------------------------------------------------------------
 

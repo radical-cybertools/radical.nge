@@ -12,8 +12,9 @@ import os            as _os
 
 
 # ------------------------------------------------------------------------------
-# import NGE API
-from nge import *
+# import NGE APIs
+from nge_rp import NGE_RP
+from nge_rs import NGE_RS
 
 
 _mod_root = _os.path.dirname (__file__)
