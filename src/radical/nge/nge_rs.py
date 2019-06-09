@@ -106,23 +106,30 @@ class NGE_RS(object):
 
     # --------------------------------------------------------------------------
     #
-    def session(self, sid=None):
+    def logout(self):
         '''
-        check if the named session exists.  If not, the session is created.
-        If sid is None, then no session is connected or created.
-
-        The method will return the sid of the currently active session
-        (or `None` if no session is active).
+        delete all sessions, terminate all pilots, invalidate the cookie.
         '''
 
-        data = {'sid': sid}
-
-        return self._query('put', '/session/', data=data)
+        return self._query('put', '/logout/')
 
 
     # --------------------------------------------------------------------------
     #
-    def list_sessions(self):
+    def sessions_create(self, sid):
+        '''
+        create named session exists.  This will raise an error if the session
+        already exists.
+        '''
+
+        data = {'sid': sid}
+
+        return self._query('put', '/sessions/%s/' % sid)
+
+
+    # --------------------------------------------------------------------------
+    #
+    def sessions_inspect(self):
         '''
         return all session IDs known for this user (irrespective of session
         state)
@@ -133,9 +140,20 @@ class NGE_RS(object):
 
     # --------------------------------------------------------------------------
     #
-    def request_backfill_resources(self, request_stub, partition, policy):
+    def sessions_close(self, sid):
         '''
-        request resources as backfill jobs.
+        close the given session,  terminate all pilots and tasks.
+        '''
+
+        return self._query('delete', '/sessions/%s/' % sid)
+
+
+    # --------------------------------------------------------------------------
+    #
+    def pilots_submit(self, descriptions):
+        '''
+        request pilots, either as backfill or batch queue pilots.  This call
+        will return a list of pilot IDs.
         '''
 
         return self._query('put', '/resources/backfill/%s/%s/' % 
@@ -144,9 +162,9 @@ class NGE_RS(object):
 
     # --------------------------------------------------------------------------
     #
-    def request_resources(self, requests):
+    def pilots_submit(self, requests):
         '''
-        request a new resource (ie. submit a new RP pilot) for a given set of
+        request a new pilot for a given set of
         cores / walltime.
         '''
 

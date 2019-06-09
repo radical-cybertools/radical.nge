@@ -191,6 +191,20 @@ class NGE_Server(object):
     #
     @methodroute('/login/', method='PUT')
     def login(self):
+        '''
+        Connect to the service.
+
+        This expects json data of the form:
+
+            {
+                 'username' : 'foo', 
+                 'password' : 'bar'
+            }
+
+        The response will contain a cookie which must be used for subsequent
+        requests to this service endpoint.  The cookie is valid until `logout`
+        is called.
+        '''
 
         self._log.info('login')
         try:
@@ -216,7 +230,7 @@ class NGE_Server(object):
             bottle.response.set_cookie('secret',   username, path='/', secret=secret)
 
             return {'success' : True,
-                    'result'  : username}
+                    'result'  : None}
 
         except Exception as e:
             self._log.exception('login failed')
@@ -229,6 +243,13 @@ class NGE_Server(object):
     #
     @methodroute('/logout/', method='PUT')
     def logout(self):
+        '''
+        This method will invalidate the session cookie, and all further
+        operations (apart from a new login) will cause an error.  
+
+        On logout, all sessions for the user will be closed, all pilots will be
+        terminated.
+        '''
 
         try:
             account = self._check_cookie(bottle.request)
@@ -252,29 +273,31 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/session/', method='PUT')
-    def session(self):
+    @methodroute('/sessions/<sid>/', method='PUT')
+    def sessions_create(self, sid):
+        '''
+        For any user (login), several `sessions` can coexist.  A session is here
+        defined as a set of pilot resources and tasks.  A `PUT` on this route
+        will create such a session.
+
+        The call will raise an error if the session exists.
+        '''
 
         try:
             account = self._check_cookie(bottle.request)
-            data    = json.loads(bottle.request.body.read())
-            sid     = data.get('sid')
             session = None
 
-            if sid and sid not in account['sessions']:
-                self._log.info('session create %s', sid)
-                session = rn.NGE_RP(self._rep, self._log, self._prof)
-                account['sessions'][sid] = session
+            if sid in account['sessions']:
+                raise ValueError('session %s exists' %  sid)
 
-            if sid:
-                self._log.info('session active %s', sid)
-                account['active'] = sid
+           session = rn.NGE_RP(self._rep, self._log, self._prof)
+           account['sessions'][sid] = session
 
             return {'success' : True,
-                    'result'  : account['active']}
+                    'result'  : None}
 
         except Exception as e:
-            self._log.exception('session failed')
+            self._log.exception('session crceation failed')
             return {'success' : False,
                     'error'   : repr(e)}
 
@@ -282,7 +305,7 @@ class NGE_Server(object):
     # --------------------------------------------------------------------------
     #
     @methodroute('/sessions/', method='GET')
-    def list_sessions(self):
+    def sessions_inspect(self):
         '''
         List all known session IDs for the current user
         '''
@@ -301,11 +324,11 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/session/<sid>/', method='DELETE')
-    def stop_session(self, sid):
+    @methodroute('/sessions/<sid>/', method='DELETE')
+    def sessions_close(self, sid):
         '''
-        Stop the session identified by `sid`.  This will terminate all pilots
-        started in this session.
+        Close the session identified by `sid`.  This will terminate all pilots
+        and tasks started in this session.
         '''
 
         try:
@@ -328,18 +351,16 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/backfill/<partition>/<policy>/', method='PUT')
-    def request_backfill_resources(self, partition, policy):
+    @methodroute('/sessions/<sid>/pilots/', method='PUT')
+    def pilots_submit(self, sid):
 
 
         try:
             data    = json.loads(bottle.request.body.read())
             account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
+            session = self._get_session(account, sid)
 
-            PWD     = os.path.dirname(rn.__file__)
-            pol     = ru.read_json('%s/policies/%s.json' % (PWD, policy))
-            retval  = session.request_backfill_resources(data, partition, pol)
+            retval  = session.pilots_submit(data)
 
             return {'success' : True,
                     'result'  : retval}
@@ -352,29 +373,8 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/', method='PUT')
-    def request_resources(self):
-
-
-        try:
-            data    = json.loads(bottle.request.body.read())
-            account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.request_resources(data)
-
-            return {'success' : True,
-                    'result'  : retval}
-
-        except Exception as e:
-            self._log.exception('oops')
-            return {'success' : False,
-                    'error'   : repr(e)}
-
-
-    # --------------------------------------------------------------------------
-    #
-    @methodroute('/resources/', method='GET')
-    def list_resources(self):
+    @methodroute('/sessions/<sid>/pilots/', method='GET')
+    def pilots_inspect(self, sid):
 
         try:
             account = self._check_cookie(bottle.request)
@@ -392,105 +392,14 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/<states>', method='GET')
-    def find_resources(self, states=None):
+    @methodroute('/sessions/<sid>/pilots/<pids>/wait/>', method='PUT')
+    @methodroute('/sessions/<sid>/pilots/wait/>',        method='PUT')
+    def pilots_wait(self, sid, pids):
 
         try:
-            account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.find_resources(states)
 
-            return {'success' : True,
-                    'result'  : retval}
-
-        except Exception as e:
-            self._log.exception('oops')
-            return {'success' : False,
-                    'error'   : repr(e)}
-
-
-    # --------------------------------------------------------------------------
-    #
-    @methodroute('/resources/requested', method='GET')
-    def get_requested_resources(self):
-
-        try:
-            account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.get_requested_resources()
-
-            return {'success' : True,
-                    'result'  : retval}
-
-        except Exception as e:
-            self._log.exception('oops')
-            return {'success' : False,
-                    'error'   : repr(e)}
-
-
-    # --------------------------------------------------------------------------
-    #
-    @methodroute('/resources/available', method='GET')
-    def get_available_resources(self):
-
-        try:
-            account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.get_available_resources()
-
-            return {'success' : True,
-                    'result'  : retval}
-
-        except Exception as e:
-            self._log.exception('oops')
-            return {'success' : False,
-                    'error'   : repr(e)}
-
-
-    # --------------------------------------------------------------------------
-    #
-    @methodroute('/resources/<resource_ids>/info', method='GET')
-    def get_resource_info(self, resource_ids):
-
-        try:
-            account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.get_resource_info(resource_ids)
-
-            return {'success' : True,
-                    'result'  : retval}
-
-        except Exception as e:
-            self._log.exception('oops')
-            return {'success' : False,
-                    'error'   : repr(e)}
-
-
-    # --------------------------------------------------------------------------
-    #
-    @methodroute('/resources/<resource_ids>/state', method='GET')
-    def get_resource_states(self, resource_ids):
-
-        try:
-            account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.get_resource_states(resource_ids)
-
-            return {'success' : True,
-                    'result'  : retval}
-
-        except Exception as e:
-            self._log.exception('oops')
-            return {'success' : False,
-                    'error'   : repr(e)}
-
-
-    # --------------------------------------------------------------------------
-    #
-    @methodroute('/resources/<resource_ids>/wait/<states>/<timeout>', method='GET')
-    def wait_resource_states(self, resource_ids, states, timeout):
-
-        try:
+            states  = data.get(['states')
+            timeout = data.get('timeout')
             account = self._check_cookie(bottle.request)
             session = self._get_session(account)
             retval  = session.wait_resource_states(resource_ids, states, timeout)
@@ -506,13 +415,14 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/resources/<resource_ids>/cancel', method='GET')
-    def cancel_resources(self, resource_ids):
+    @methodroute('/sessions/<sid>/pilots/<pids>', method='DELETE')
+    @methodroute('/sessions/<sid>/pilots/',       method='DELETE')
+    def pilots_cancel(self, sid, pids=None):
 
         try:
             account = self._check_cookie(bottle.request)
             session = self._get_session(account)
-            retval  = session.cancel_resources(resource_ids)
+            retval  = session.pilots.cancel(pids)
 
             return {'success' : True,
                     'result'  : retval}

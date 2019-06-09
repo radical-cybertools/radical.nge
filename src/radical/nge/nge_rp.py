@@ -58,9 +58,26 @@ class NGE_RP(object):
 
     # --------------------------------------------------------------------------
     #
-    def request_backfill_resources(self, request_stub, partition, policy):
+    def pilots_submit(self, request):
+
+        descr   = request['description']
+        part    = request['partition']
+        policy  = request['policy']
+
+        if request['backfill']:
+           PWD     = os.path.dirname(rn.__file__)
+           pol     = ru.read_json('%s/policies/%s.json' % (PWD, policy))
+           return self._pilots_backfill(descr, part, policy)
+
+        else:
+           return self._pilots_queue(descr, part, policy)
+
+
+    # --------------------------------------------------------------------------
+    #
+    def _pilots_backfill(self, request_stub, partition, policy):
         '''
-        Request new backfill resources, chunked by the given max_cores and
+        Request new backfill pilots, chunked by the given max_cores and
         max_walltime.  The given request_stub is used as template for the pilot
         descriptions.
         '''
@@ -68,8 +85,7 @@ class NGE_RP(object):
         max_cores    = policy.get('max_cores'   , MAX_CORES   )
         max_walltime = policy.get('max_walltime', MAX_WALLTIME)
 
-        self._rep.header('request resources tasks\n')
-        self._rep.info('\nrequesting backfill resources\n')
+        self._rep.info('\nrequesting backfill pilots\n')
         bf = get_backfill(partition, max_cores, max_walltime)
 
       # print 'bf list:'
@@ -86,24 +102,24 @@ class NGE_RP(object):
                  }
             self._rep.ok('backfill  on %s [%5dcores * %4dmin] @ %10s(%10s)]\n' %
                          (pd['resource'], pd['cores'], pd['runtime'],
-                          pd['queue'], pd['project']))
+                          pd['queue'],    pd['project']))
           # pprint.pprint(pd)
             pds.append(rp.ComputePilotDescription(pd))
 
         pilots = self._pmgr.submit_pilots(pds)
         self._umgr.add_pilots(pilots)
 
+        return [p.uid for p in pilots]
+
 
     # --------------------------------------------------------------------------
     #
-    def request_resources(self, requests):
+    def pilots_queue(self, requests):
         '''
-        request a new resource (ie. submit a new RP pilot) for a given set of
-        cores / walltime.
+        submit a new pilot to the batchs system
         '''
 
-        self._rep.header('request resources tasks\n')
-        self._rep.info('\nrequesting dedicated resources\n')
+        self._rep.info('\nrequesting dedicated pilots\n')
         pds = list()
         for request in requests:
             pd  = {'resource' : request.get('resource', 'local.localhost'),
@@ -125,145 +141,61 @@ class NGE_RP(object):
 
     # --------------------------------------------------------------------------
     #
-    def list_resources(self):
+    def pilots_inspect(self, pids=None):
 
-        self._rep.info('\nresource listing\n')
-        [self._rep.ok('%s\n' % pilot.uid) for pilot in self._pmgr.get_pilots()]
+        self._rep.info('\nget pilot info: %s\n' % pids)
 
-        return [pilot.uid for pilot in self._pmgr.get_pilots()]
+        if pids and not isinstance(pids, list): pids = pids
 
-
-    # --------------------------------------------------------------------------
-    #
-    def find_resources(self, states=None):
-
-        if   not states                  : states = list()
-        elif not isinstance(states, list): states = [states]
-
-        self._rep.info('\nresource query (%s)\n' % states)
-        [self._rep.ok('%s\n' % pilot.uid) for pilot in self._pmgr.get_pilots()]
-        ret = list()
-        if states:
-            for pilot in self._pmgr.get_pilots():
-                if pilot.state in states:
-                    ret.append(pilot.uid)
-        else:
-            ret = self._pmgr.list_pilots()
-
-        return ret
-
-
-    # --------------------------------------------------------------------------
-    #
-    def get_requested_resources(self):
-
-        self._rep.info('\nresource info query\n')
-
-        ret = list()
-        for info in self.get_resource_info():
-            ret.append([info['uid'], info['state'], 
-                        info['description']['cores'], 
-                        info['description']['runtime']
-                      ])
-            self._rep.ok('%s: %10s [%5dcores * %4dmin]\n' % 
-                         (info['uid'], info['state'],
-                          info['description']['cores'], 
-                          info['description']['runtime']))
-        return ret
-
-
-    # --------------------------------------------------------------------------
-    #
-    def get_available_resources(self):
-
-        self._rep.info('\nresource info query (active)\n')
-
-        ret = list()
-        for info in self.get_resource_info():
-            if info['state'] == rp.PMGR_ACTIVE:
-                ret.append([info['uid'], info['state'], 
-                            info['description']['cores'], 
-                            info['description']['runtime']
-                           ])
-                self._rep.ok('%s: %10s [%5dcores * %4dmin]\n' % 
-                             (info['uid'], info['state'],
-                              info['description']['cores'], 
-                              info['description']['runtime']))
-        return ret
-
-
-    # --------------------------------------------------------------------------
-    #
-    def get_resource_info(self, resource_ids=None):
-
-        if   not resource_ids                  : resource_ids = list()
-        elif not isinstance(resource_ids, list): resource_ids = [resource_ids]
-
-        ret = list()
-        if resource_ids:
-
-            pilots = self._pmgr.get_pilots()
-
-            if   not pilots                  : pilots = list()
-            elif not isinstance(pilots, list): pilots = [pilots]
-
-            for pilot in pilots:
-                if pilot.uid in resource_ids:
-                    ret.append(pilot.as_dict())
-        else:
-            for pilot in self._pmgr.get_pilots():
-                ret.append(pilot.as_dict())
-
-        return ret
-
-
-    # --------------------------------------------------------------------------
-    #
-    def get_resource_states(self, resource_ids=None):
-
-        self._rep.info('\nresource state query\n')
-        pilots = self._pmgr.get_pilots(resource_ids)
+        pinfo  = list()
+        pilots = self._pmgr.get_pilots(uids=pids)
 
         if   not pilots                  : pilots = list()
         elif not isinstance(pilots, list): pilots = [pilots]
 
         for pilot in pilots:
-            self._rep.ok('%s: %10s\n' % (pilot.uid, pilot.state))
-        return [pilot.state for pilot in pilots]
+            self._rep.ok('    %s\n' % pilot.uid)
+            pinfo.append(pilot.as_dict())
+
+        return pinfo
 
 
     # --------------------------------------------------------------------------
     #
-    def wait_resource_states(self, resource_ids=None, 
-                             states=None, timeout=None):
+    def pilots_wait(self, pids=None, 
+                    states=None, timeout=None):
 
-        self._rep.info('\nwait for resource\n')
-        return self._pmgr.wait_pilots(uids=resource_ids, state=states,
-                                      timeout=timeout)
+        if pids and not isinstance(pids, list): pids = pids
+
+        self._rep.info('\nwait for pilots: %s (%s)\n' % (pids, states))
+        return self._pmgr.wait_pilots(uids=pids, state=states, timeout=timeout)
 
 
     # --------------------------------------------------------------------------
     #
-    def cancel_resources(self, resource_ids=None):
+    def pilots_cancel(self, pids=None):
 
-        self._rep.info('\ncancel resources query\n')
-        pilots = self._pmgr.get_pilots(resource_ids)
+        self._rep.info('\ncancel pilots %s\n' % pids)
 
-        self._pmgr.cancel_pilots(resource_ids)
-        self._pmgr.wait_pilots  (resource_ids, rp.FINAL)
+        self._pmgr.cancel_pilots(pids)
+        self._pmgr.wait_pilots  (pids, rp.FINAL)
+
+        if pids and not isinstance(pids, list): pids = pids
 
         if   not pilots                  : pilots = list()
         elif not isinstance(pilots, list): pilots = [pilots]
 
-        for pilot in pilots:
+        states = list()
+        for pilot in self._pmgr.get_pilots(pids):
             self._rep.ok('%s: %10s\n' % (pilot.uid, pilot.state))
+            states.append(pilot.state)
 
-        return [pilot.state for pilot in pilots]
+        return states
 
 
     # --------------------------------------------------------------------------
     #
-    def submit_tasks(self, descriptions):
+    def tasks_submit(self, descriptions):
 
         # FIXME: we actually get PANDA task descriptions here, which we need to
         #        translate into RP unit descriptions
@@ -289,7 +221,7 @@ class NGE_RP(object):
         # routines.  To learn about final units, we registered this unit state
         # callback.on umgr creation.
         if state == rp.DONE:
-          # self._rep.ok('task completed %s\n' % unit.uid)
+            self._rep.ok('task completed %s\n' % unit.uid)
             pass
             # FIXME: panda level output file staging goes here.
             # FIXME: we need to make sure that PANDA is informed when our output
@@ -303,39 +235,39 @@ class NGE_RP(object):
             # NOTE:  can we translate the panda staging into proper RP staging
             #        directives, to avoid explicit control management?
         elif state == rp.FAILED:
-          # self._rep.error('task failed    %s\n' % unit.uid)
+            self._rep.error('task failed    %s\n' % unit.uid)
             pass
 
 
     # --------------------------------------------------------------------------
     #
-    def list_tasks(self):
+    def tasks_inspect(self, tids=None):
 
-        return self._umgr.list_units()
+        self._rep.info('\nget task info: %s\n' % tids)
 
+        if tids and not isinstance(tids, list): tids = tids
 
-    # --------------------------------------------------------------------------
-    #
-    def get_task_states(self, task_ids=None):
+        tinfo = list()
+        tasks = self._umgr.get_units(uids=tids)
 
-        if task_ids:
-            if not isinstance(task_ids, list):
-                task_ids = [task_ids]
+        if   not tasks                  : tasks = list()
+        elif not isinstance(tasks, list): tasks = [tasks]
 
-        units = self._umgr.get_units(task_ids)
+        for task in tasks:
+            self._rep.ok('    %s\n' % task.uid)
+            tinfo.append(task.as_dict())
 
-        if   not units:                   units = list()
-        elif not isinstance(units, list): units = [units]
-
-        return [unit.state for unit in units]
+        return tinfo
 
 
     # --------------------------------------------------------------------------
     #
-    def wait_task_states(self, task_ids=None, states=None, timeout=None):
+    def tasks_wait(self, tids=None, states=None, timeout=None):
 
-        return self._umgr.wait_units(uids=task_ids, state=states,
-                                     timeout=timeout)
+        if tids and not isinstance(tids, list): tids = tids
+
+        self._rep.info('\nwait for tasks: %s (%s)\n' % (tids, states))
+        return self._umgr.wait_units(uids=tids, state=states, timeout=timeout)
 
 
 # ------------------------------------------------------------------------------
