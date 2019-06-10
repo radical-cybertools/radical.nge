@@ -25,73 +25,72 @@ if __name__ == '__main__':
     psize = int(n * usize / ugen)
 
     nge = None
-    sid = None
+    sid = 'foo.1'
     url = 'http://guest:guest@localhost:8090/'
 
-    try:
-        print 'connect'
-        nge = rn.NGE_RS(url=url, sid=sid)
+    print 'connect'
+    nge = rn.NGE_RS(url=url)
 
-        print 'check_session'
-        sid = nge.session()
-        print 'sid: %s' % sid
+    print 'inspect sessions'
+    info = nge.pilots_inspect(sid)
+    for p in info:
+        print '%s: %s' % (p['uid'], p['state'])
 
-        print 'list_sessions'
-        print nge.list_sessions()
-        
-        sid = 'foo.1'
-        print 'start_session %s' % sid
-        nge.session(sid)
+    print 'inspect pilots'
+    info = nge.pilots_inspect(sid)
+    for p in info:
+        print '%s: %s' % (p['uid'], p['state'])
+    print 'ok'
 
-        print 'check_session'
-        print 'sid: %s' % nge.session()
+    print 'wait pilots'
+    print nge.pilots_wait(sid, states=rp.PMGR_ACTIVE)
+    print 'ok'
 
-        print 'submit a task'
-        tasks = list()
-        for _ in range(unum):
-            tasks.append({   'executable'       : '/bin/sleep',
-                             'arguments'        : [utime],
-                           # 'arguments'        : ['gromacs_canon/gromacs.sh', cores, utime],
-                           # 'input_staging'    : [{'source': 'file:///ccs/home/merzky1/radical/radical.nge/examples/gromacs.canon', 
-                           #                        'target': 'unit:///gromacs_canon',
-                           #                        'action': rp.TARBALL}],
-                             'cpu_processes'    : 1,
-                             'cpu_threads'      : usize,
-                             'cpu_process_type' : rp.POSIX,
-                             'cpu_thread_type'  : rp.POSIX,
-                             'cpu_process_type' : 'fork',
-                        })
-        print nge.submit_tasks(tasks)
-        print 'ok'
+    print 'inspect pilots'
+    info = nge.pilots_inspect(sid)
+    for p in info:
+        print '%s: %s' % (p['uid'], p['state'])
+    print 'ok'
 
-#       print 'list tasks'
-#       print nge.list_tasks()
-#       print 'ok'
-#
-#       print 'get task states'
-#       print nge.get_task_states()
-#       print 'ok'
+    print 'submit tasks'
+    tasks = list()
+    for _ in range(unum):
+        tasks.append({'executable'       : '/bin/sleep',
+                      'arguments'        : [utime],
+                      'cpu_processes'    : 1,
+                      'cpu_threads'      : usize,
+                      'cpu_process_type' : rp.POSIX,
+                      'cpu_thread_type'  : rp.POSIX,
+                      'pilot'            : None
+                    })
+    print nge.tasks_submit(sid, tasks)
+    print 'ok'
 
-        print 'wait for task completion'
-        print nge.wait_task_states(states=rp.FINAL)
-        print 'ok'
+    print 'inspect tasks'
+    info = nge.tasks_inspect(sid)
+    for t in info:
+        print '%s: %s' % (t['uid'], t['state'])
+    print 'ok'
 
-        print 'get task states'
-        print nge.get_task_states()
-        print 'ok'
+    print 'wait for task completion'
+    print nge.tasks_wait(sid, states=rp.FINAL)
+    print 'ok'
 
-        print 'cancel resources'
-        print nge.cancel_resources()
-        print 'ok'
+    print 'inspect tasks'
+    info = nge.tasks_inspect(sid)
+    for t in info:
+        print '%s: %s' % (t['uid'], t['state'])
+    print 'ok'
 
+    print 'cancel resources'
+    print nge.pilots_cancel(sid)
+    print 'ok'
 
-    finally:
-        if nge:
-            pass
-          # print 'logout'
-          # nge.logout()
-          # print 'ok'
-          # raise
+    print 'inspect pilots'
+    info = nge.pilots_inspect(sid)
+    for p in info:
+        print '%s: %s' % (p['uid'], p['state'])
+    print 'ok'
 
 
 # ------------------------------------------------------------------------------

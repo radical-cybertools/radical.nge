@@ -3,12 +3,12 @@
 __copyright__ = 'Copyright 2017, http://radical.rutgers.edu'
 __license__   = 'MIT'
 
+
 # --------------------------------------------------------------------------
 #
 # see https://docs.google.com/document/d/ \
 #                             1bm8ucgfi9SHjDy0w-ZX5NIdkjk87qFClMB9jMse75uM
 #
-
 import os
 import json
 import bottle
@@ -21,7 +21,9 @@ import radical.nge   as rn
 # https://stackoverflow.com/questions/8725605/
 def methodroute(route, **kwargs):
     def decorator(f):
-        f.route = route
+        if not hasattr(f, 'routes'):
+            f.routes = list()
+        f.routes.append(route)
         for arg in kwargs:
             setattr(f, arg, kwargs[arg])
         return f
@@ -33,29 +35,30 @@ def methodroute(route, **kwargs):
 def routeapp(obj):
     for kw in dir(obj):
         attr = getattr(obj, kw)
-        if hasattr(attr, 'route'):
-            if hasattr(attr, 'method'):
-                method = getattr(attr, 'method')
-            else:
-                method = 'GET'
-            if hasattr(attr, 'callback'):
-                callback = getattr(attr, 'callback')
-            else:
-                callback = None
-            if hasattr(attr, 'name'):
-                name = getattr(attr, 'name')
-            else:
-                name = None
-            if hasattr(attr, 'apply'):
-                aply = getattr(attr, 'apply')
-            else:
-                aply = None
-            if hasattr(attr, 'skip'):
-                skip = getattr(attr, 'skip')
-            else:
-                skip = None
+        if hasattr(attr, 'routes'):
+            for route in attr.routes:
+                if hasattr(attr, 'method'):
+                    method = getattr(attr, 'method')
+                else:
+                    method = 'GET'
+                if hasattr(attr, 'callback'):
+                    callback = getattr(attr, 'callback')
+                else:
+                    callback = None
+                if hasattr(attr, 'name'):
+                    name = getattr(attr, 'name')
+                else:
+                    name = None
+                if hasattr(attr, 'apply'):
+                    aply = getattr(attr, 'apply')
+                else:
+                    aply = None
+                if hasattr(attr, 'skip'):
+                    skip = getattr(attr, 'skip')
+                else:
+                    skip = None
 
-            bottle.route(attr.route, method, callback, name, aply, skip)(attr)
+                bottle.route(route, method, callback, name, aply, skip)(attr)
 
 
 # ------------------------------------------------------------------------------
@@ -69,7 +72,6 @@ class _Account(dict):
         self['username'] = username
         self['password'] = password
         self['sessions'] = dict()
-        self['active'  ] = None
         self['secret'  ] = None
 
 
@@ -113,7 +115,7 @@ class NGE_Server(object):
         host = str(os.environ.get('RADICAL_NGE_HOST', '0.0.0.0'))
 
         self._rep.info('serve on http://%s:%d/\n\n' % (host, port))
-        bottle.run(host=host, port=port, debug=False, quiet=True)
+        bottle.run(host=host, port=port, debug=True, quiet=False)
 
 
     # --------------------------------------------------------------------------
@@ -163,7 +165,7 @@ class NGE_Server(object):
         Check if given username is known and return the full account record
         '''
 
-        if not username in self._accounts:
+        if username not in self._accounts:
             raise ValueError('invalid username [%s]' % username)
 
         return self._accounts[username]
@@ -171,18 +173,13 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    def _get_session(self, account):
+    def _get_session(self, account, sid):
         '''
-        Check if a session is active and return it
+        Check if a session exists and return it
         '''
-
-        sid = account.get('active')
-
-        if not sid:
-            raise RuntimeError('no active session')
 
         if sid not in account['sessions']:
-            raise RuntimeError('session %s disappeared' % sid)
+            raise ValueError('session %s does not exist' % sid)
 
         return account['sessions'][sid]
 
@@ -227,7 +224,8 @@ class NGE_Server(object):
                 account['secret'] = secret
 
             bottle.response.set_cookie('username', username, path='/')
-            bottle.response.set_cookie('secret',   username, path='/', secret=secret)
+            bottle.response.set_cookie('secret',   username, path='/',
+                                       secret=secret)
 
             return {'success' : True,
                     'result'  : None}
@@ -290,8 +288,8 @@ class NGE_Server(object):
             if sid in account['sessions']:
                 raise ValueError('session %s exists' %  sid)
 
-           session = rn.NGE_RP(self._rep, self._log, self._prof)
-           account['sessions'][sid] = session
+            session = rn.NGE_RP(self._rep, self._log, self._prof)
+            account['sessions'][sid] = session
 
             return {'success' : True,
                     'result'  : None}
@@ -351,15 +349,17 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
+    # Pilots
+    #
+    # --------------------------------------------------------------------------
+    #
     @methodroute('/sessions/<sid>/pilots/', method='PUT')
     def pilots_submit(self, sid):
 
-
         try:
-            data    = json.loads(bottle.request.body.read())
             account = self._check_cookie(bottle.request)
             session = self._get_session(account, sid)
-
+            data    = json.loads(bottle.request.body.read())
             retval  = session.pilots_submit(data)
 
             return {'success' : True,
@@ -373,13 +373,21 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/sessions/<sid>/pilots/', method='GET')
-    def pilots_inspect(self, sid):
+    @methodroute('/sessions/<sid>/pilots/<pid>/', method='GET')
+    @methodroute('/sessions/<sid>/pilots/',       method='GET')
+    def pilots_inspect(self, sid, pid=None):
 
         try:
             account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.list_resources()
+            session = self._get_session(account, sid)
+
+            if pid:
+                pids = [pid]
+            else:
+                data = json.loads(bottle.request.body.read())
+                pids = data.get('pids')
+
+            retval = session.pilots_inspect(pids)
 
             return {'success' : True,
                     'result'  : retval}
@@ -392,17 +400,24 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/sessions/<sid>/pilots/<pids>/wait/>', method='PUT')
-    @methodroute('/sessions/<sid>/pilots/wait/>',        method='PUT')
-    def pilots_wait(self, sid, pids):
+    @methodroute('/sessions/<sid>/pilots/<pid>/', method='POST')
+    @methodroute('/sessions/<sid>/pilots/',       method='POST')
+    def pilots_wait(self, sid, pid=None):
 
         try:
-
-            states  = data.get(['states')
-            timeout = data.get('timeout')
             account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.wait_resource_states(resource_ids, states, timeout)
+            session = self._get_session(account, sid)
+            data    = json.loads(bottle.request.body.read())
+
+            if pid:
+                pids = [pid]
+            else:
+                pids = data.get('pids')
+
+            states  = data.get('states')
+            timeout = data.get('timeout')
+
+            retval  = session.pilots_wait(pids, states, timeout)
 
             return {'success' : True,
                     'result'  : retval}
@@ -421,8 +436,8 @@ class NGE_Server(object):
 
         try:
             account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.pilots.cancel(pids)
+            session = self._get_session(account, sid)
+            retval  = session.pilots_cancel(pids)
 
             return {'success' : True,
                     'result'  : retval}
@@ -435,13 +450,21 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/tasks/', method='GET')
-    def list_tasks(self):
+    # Tasks
+    #
+    # --------------------------------------------------------------------------
+    #
+    @methodroute('/sessions/<sid>/tasks/', method='PUT')
+    def tasks_submit(self, sid):
 
         try:
             account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.list_tasks()
+            session = self._get_session(account, sid)
+            data    = json.loads(bottle.request.body.read())
+
+            tds = data['descriptions']
+
+            retval  = session.tasks_submit(tds)
 
             return {'success' : True,
                     'result'  : retval}
@@ -454,15 +477,21 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/tasks/', method='PUT')
-    def submit_tasks(self):
-
-        descriptions = json.loads(bottle.request.body.read())
+    @methodroute('/sessions/<sid>/tasks/<tid>/', method='GET')
+    @methodroute('/sessions/<sid>/tasks/',       method='GET')
+    def tasks_inspect(self, sid, tid=None):
 
         try:
             account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.submit_tasks(descriptions)
+            session = self._get_session(account, sid)
+
+            if tid:
+                tids = [tid]
+            else:
+                data = json.loads(bottle.request.body.read())
+                tids = data.get('tids')
+
+            retval = session.tasks_inspect(tids)
 
             return {'success' : True,
                     'result'  : retval}
@@ -475,72 +504,23 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/tasks/<task_ids>/state', method='GET')
-    def get_task_states(self, task_ids):
+    @methodroute('/sessions/<sid>/tasks/<task_id>/', method='POST')
+    @methodroute('/sessions/<sid>/tasks/',           method='POST')
+    def tasks_wait(self, sid, tid=None):
 
         try:
             account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.get_task_states(task_ids)
+            session = self._get_session(account, sid)
 
-            return {'success' : True,
-                    'result'  : retval}
+            if tid: tids = [tid]
+            else  : tids = None
 
-        except Exception as e:
-            self._log.exception('oops')
-            return {'success' : False,
-                    'error'   : repr(e)}
+            data    = json.loads(bottle.request.body.read())
 
+            states  = data.get('states')
+            timeout = data.get('timeout')
+            retval  = session.tasks_wait(tids, states, timeout)
 
-    # --------------------------------------------------------------------------
-    #
-    @methodroute('/tasks/state', method='GET')
-    def get_tasks_states(self):
-
-        try:
-            account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.get_task_states()
-
-            return {'success' : True,
-                    'result'  : retval}
-
-        except Exception as e:
-            self._log.exception('oops')
-            return {'success' : False,
-                    'error'   : repr(e)}
-
-
-    # --------------------------------------------------------------------------
-    #
-    @methodroute('/tasks/<task_ids>/wait/<states>/<timeout>', method='GET')
-    def wait_task_states(self, task_ids, states, timeout):
-
-        try:
-            account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.wait_task_states(task_ids, states, timeout)
-
-            return {'success' : True,
-                    'result'  : retval}
-
-        except Exception as e:
-            self._log.exception('oops')
-            return {'success' : False,
-                    'error'   : repr(e)}
-
-
-    # --------------------------------------------------------------------------
-    #
-    @methodroute('/tasks/wait/<states>/<timeout>', method='GET')
-    def wait_tasks_states(self, states, timeout):
-
-        try:
-            account = self._check_cookie(bottle.request)
-            session = self._get_session(account)
-            retval  = session.wait_task_states(task_ids=None,
-                                               states=states,
-                                               timeout=timeout)
             return {'success' : True,
                     'result'  : retval}
 

@@ -3,15 +3,25 @@ __copyright__ = "Copyright 2013-2014, http://radical.rutgers.edu"
 __license__   = "MIT"
 
 
-import time
+import os
 
 import radical.pilot as rp
+import radical.utils as ru
 
 from .utils import get_backfill
 
 
 MAX_CORES    = 160  # 10 nodes on titan
 MAX_WALLTIME =  60  #  1 hour == debug on titan
+
+
+# ------------------------------------------------------------------------------
+#
+def tolist(thing):
+
+    if   thing is None          : return []
+    elif isinstance(thing, list): return thing
+    else                        : return [thing]
 
 
 # --------------------------------------------------------------------------
@@ -58,53 +68,24 @@ class NGE_RP(object):
 
     # --------------------------------------------------------------------------
     #
-    def pilots_submit(self, request):
+    def pilots_submit(self, requests):
 
-        descr   = request['description']
-        part    = request['partition']
-        policy  = request['policy']
+        req_norm = list()
+        req_bf   = list()
 
-        if request['backfill']:
-           PWD     = os.path.dirname(rn.__file__)
-           pol     = ru.read_json('%s/policies/%s.json' % (PWD, policy))
-           return self._pilots_backfill(descr, part, policy)
+        for request in requests:
 
-        else:
-           return self._pilots_queue(descr, part, policy)
+            bf = bool(request.get('backfill'))
 
-
-    # --------------------------------------------------------------------------
-    #
-    def _pilots_backfill(self, request_stub, partition, policy):
-        '''
-        Request new backfill pilots, chunked by the given max_cores and
-        max_walltime.  The given request_stub is used as template for the pilot
-        descriptions.
-        '''
-
-        max_cores    = policy.get('max_cores'   , MAX_CORES   )
-        max_walltime = policy.get('max_walltime', MAX_WALLTIME)
-
-        self._rep.info('\nrequesting backfill pilots\n')
-        bf = get_backfill(partition, max_cores, max_walltime)
-
-      # print 'bf list:'
-      # import pprint
-      # pprint.pprint(bf)
+            if bf: req_bf.append(request)
+            else : req_norm.append(request)
 
         pds = list()
-        for [partition, cores, walltime] in bf:
-            pd = {'resource': request_stub.get('resource', 'local.localhost'),
-                  'project' : request_stub.get('project'),
-                  'queue'   : request_stub.get('queue'),
-                  'cores'   : cores, 
-                  'runtime' : walltime
-                 }
-            self._rep.ok('backfill  on %s [%5dcores * %4dmin] @ %10s(%10s)]\n' %
-                         (pd['resource'], pd['cores'], pd['runtime'],
-                          pd['queue'],    pd['project']))
-          # pprint.pprint(pd)
-            pds.append(rp.ComputePilotDescription(pd))
+        if req_bf:
+            pds += self._pilots_backfill(req_bf)
+
+        if req_norm:
+            pds += self._pilots_queue(req_norm)
 
         pilots = self._pmgr.submit_pilots(pds)
         self._umgr.add_pilots(pilots)
@@ -114,13 +95,59 @@ class NGE_RP(object):
 
     # --------------------------------------------------------------------------
     #
-    def pilots_queue(self, requests):
+    def _pilots_backfill(self, requests):
+        '''
+        Request new backfill pilots, chunked by the given max_cores and
+        max_walltime.  The given request_stub is used as template for the pilot
+        descriptions.
+        '''
+
+        self._rep.info('\nrequesting backfilled pilots\n')
+        pds = list()
+
+        for request in requests:
+
+            del(request['backfill'])
+
+            policy       = request['policy']
+            partition    = request['partition']
+
+            PWD          = os.path.dirname(__file__)
+            policy       = ru.read_json('%s/policies/%s.json'
+                                       % (PWD, request['policy']))
+
+            max_cores    = policy.get('max_cores'   , MAX_CORES   )
+            max_walltime = policy.get('max_walltime', MAX_WALLTIME)
+
+            self._rep.info('\nrequesting backfill pilots\n')
+            bf = get_backfill(request['partition'], max_cores, max_walltime)
+
+            for [partition, cores, walltime] in bf:
+                pd = {'resource': request.get('resource', 'local.localhost'),
+                      'project' : request.get('project'),
+                      'queue'   : request.get('queue'),
+                      'cores'   : cores, 
+                      'runtime' : walltime
+                     }
+                self._rep.ok('backfill @ %s [%5dcores * %4dmin] @ %10s(%10s)]\n'
+                            % (pd['resource'], pd['cores'], pd['runtime'],
+                               pd['queue'],    pd['project']))
+              # pprint.pprint(pd)
+                pds.append(rp.ComputePilotDescription(pd))
+
+        return pds
+
+
+    # --------------------------------------------------------------------------
+    #
+    def _pilots_queue(self, requests):
         '''
         submit a new pilot to the batchs system
         '''
 
         self._rep.info('\nrequesting dedicated pilots\n')
         pds = list()
+
         for request in requests:
             pd  = {'resource' : request.get('resource', 'local.localhost'),
                     'project' : request.get('project'),
@@ -133,10 +160,7 @@ class NGE_RP(object):
                           pd['queue'], pd['project']))
             pds.append(rp.ComputePilotDescription(pd))
 
-        pilots = self._pmgr.submit_pilots(pds)
-        self._umgr.add_pilots(pilots)
-
-        return [p.uid for p in pilots]
+        return pds
 
 
     # --------------------------------------------------------------------------
@@ -162,12 +186,12 @@ class NGE_RP(object):
 
     # --------------------------------------------------------------------------
     #
-    def pilots_wait(self, pids=None, 
-                    states=None, timeout=None):
+    def pilots_wait(self, pids=None, states=None, timeout=None):
 
-        if pids and not isinstance(pids, list): pids = pids
+        pids = tolist(pids)
 
-        self._rep.info('\nwait for pilots: %s (%s)\n' % (pids, states))
+        self._rep.info('\nwait for pilots: %s (%s) (%s)\n'
+                      % (pids, states, timeout))
         return self._pmgr.wait_pilots(uids=pids, state=states, timeout=timeout)
 
 
@@ -181,9 +205,6 @@ class NGE_RP(object):
         self._pmgr.wait_pilots  (pids, rp.FINAL)
 
         if pids and not isinstance(pids, list): pids = pids
-
-        if   not pilots                  : pilots = list()
-        elif not isinstance(pilots, list): pilots = [pilots]
 
         states = list()
         for pilot in self._pmgr.get_pilots(pids):

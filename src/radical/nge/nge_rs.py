@@ -2,16 +2,22 @@
 __copyright__ = "Copyright 2013-2014, http://radical.rutgers.edu"
 __license__   = "MIT"
 
-import os
 import json
-import time
-import pprint
 import requests
 
 import radical.utils as ru
 
 
-# --------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+#
+def tolist(thing):
+
+    if   thing is None          : return []
+    elif isinstance(thing, list): return thing
+    else                        : return [thing]
+
+
+# ------------------------------------------------------------------------------
 #
 class NGE_RS(object):
     '''
@@ -20,7 +26,7 @@ class NGE_RS(object):
 
     # --------------------------------------------------------------------------
     #
-    def __init__(self, url, sid=None, log=None, rep=None, prof=None):
+    def __init__(self, url, log=None, rep=None, prof=None):
 
         if log : self._log  = log
         else   : self._log  = ru.Logger('radical.nge')
@@ -33,17 +39,17 @@ class NGE_RS(object):
 
         self._cookies        = list()
         self._url            = ru.Url(url)
+
+        if self._url.username and self._url.password:
+            self.login(self._url.username, self._url.password)
+
         self._qbase          = ru.Url(url)
         self._qbase.username = ''
         self._qbase.password = ''
         self._qbase          = str(self._qbase)
         self._qbase          = self._qbase.rstrip('/')
 
-        if self._url.username and self._url.password:
-            self.login(self._url.username, self._url.password)
-
-        if sid:
-            self.connect_session(sid)
+        print '============ qbase: %s' % self._qbase
 
 
     # --------------------------------------------------------------------------
@@ -51,16 +57,27 @@ class NGE_RS(object):
     def _query(self, mode, route, data=None):
 
         url = self._qbase + route
-        print '---> %s' % url
+
+        ldata = -1
+        if data is not None:
+            ldata = len(str(data))
+
+        print '---> %-5s  %-60s [data:%d]' % (mode.upper(), url, ldata)
 
         self._log.debug('request %5s: %s [%s]', mode, route, data)
         self._log.debug('request %5s: %s', mode, url)
 
         if mode == 'get':
-            r = requests.get(url, cookies=self._cookies)
+            r = requests.get(url, cookies=self._cookies, json=data)
 
         elif mode == 'put':
             r = requests.put(url, cookies=self._cookies, json=data)
+
+        elif mode == 'post':
+            r = requests.post(url, cookies=self._cookies, json=data)
+
+        elif mode == 'delete':
+            r = requests.delete(url, cookies=self._cookies, json=data)
 
         else:
             raise ValueError('invalid query mode %s' % mode)
@@ -81,6 +98,7 @@ class NGE_RS(object):
         except ValueError as e:
             raise RuntimeError('query failed: %s' % repr(e))
 
+        print '     %-6s [%s]' % (result['success'], result.get('error', ''))
         if not result['success']:
             raise RuntimeError('query failed: %s' % result['error'])
 
@@ -101,7 +119,7 @@ class NGE_RS(object):
         data = {'username' : self._url.username, 
                 'password' : self._url.password}
 
-        return self._query('put', '/login/', data=data)
+        return self._query('put', '/login/', data)
 
 
     # --------------------------------------------------------------------------
@@ -150,235 +168,111 @@ class NGE_RS(object):
 
     # --------------------------------------------------------------------------
     #
-    def pilots_submit(self, descriptions):
+    def pilots_submit(self, sid, descriptions):
         '''
         request pilots, either as backfill or batch queue pilots.  This call
         will return a list of pilot IDs.
         '''
 
-        return self._query('put', '/resources/backfill/%s/%s/' % 
-                           (partition, policy), data=request_stub)
+        if   not descriptions                  : descriptions = list()
+        elif not isinstance(descriptions, list): descriptions = [descriptions]
+
+        return self._query('put', '/sessions/%s/pilots/' % sid, descriptions)
 
 
     # --------------------------------------------------------------------------
     #
-    def pilots_submit(self, requests):
+    def pilots_inspect(self, sid, pids=None):
         '''
-        request a new pilot for a given set of
-        cores / walltime.
-        '''
-
-        if   not requests                  : requests = list()
-        elif not isinstance(requests, list): requests = [requests]
-
-        return self._query('put', '/resources/', data=requests)
-
-
-    # --------------------------------------------------------------------------
-    #
-    def list_resources(self):
-        '''
-        return the UIDs for all known resources (ie. RP pilots), independent of
-        their state.
+        return information about all pilots
         '''
 
-        return self._query('get', '/resources/')
+        pids = tolist(pids)
 
-
-    # --------------------------------------------------------------------------
-    #
-    def find_resources(self, states=None):
-        '''
-        return the UIDs for all known resources (ie. RP pilots) in the given
-        states, or in any state if no state filter is defined.
-        '''
-
-        if   not states                  : states = list()
-        elif not isinstance(states, list): states = [states]
-
-        ret  = list()
-        rids = self.list_resources()
-
-        states = self.get_resource_states(rids)
-        for rid,state in zip(rids, states):
-            if state in states:
-                ret.append(rid)
-
-        return ret
-
-
-    # --------------------------------------------------------------------------
-    #
-    def get_resource_info(self, resource_ids=None):
-        '''
-        get information for all resources (ie. RP pilots) with the given UIDs
-        (or for all known resources if no UID is specified).
-        '''
-
-        if not resource_ids:
-            resource_ids = self.list_resources()
-        elif not isinstance(resource_ids, list): 
-            resource_ids = [resource_ids]
-
-        ret = list()
-        for rid in resource_ids:
-
-            info = self._query('get', '/resources/%s/info' % rid)
-            ret.append(info)
-
-        return ret
-
-
-    # --------------------------------------------------------------------------
-    #
-    def get_requested_resources(self):
-        '''
-        find all resources (ie. pilots) in *any* state, and return number of
-        cores, walltime and state as tuples.
-        '''
-
-        return self._query('get', '/resources/requested')
-
-
-    # --------------------------------------------------------------------------
-    #
-    def get_available_resources(self):
-        '''
-        find all `ACTIVE` resources (ie. pilots) and return number of cores,
-        walltime and state as tuples.
-        '''
-
-        return self._query('get', '/resources/available')
-
-
-    # --------------------------------------------------------------------------
-    #
-    def get_resource_states(self, resource_ids=None):
-        '''
-        get the state for all resources (ie. RP pilots) with the given UIDs
-        (or for all known resources if no UID is specified).
-        '''
-
-        if not resource_ids:
-            resource_ids = self.list_resources()
-        elif not isinstance(resource_ids, list):
-            resource_ids = [resource_ids]
-
-        ret = list()
-        for rid in resource_ids:
-
-            state = self._query('get', '/resources/%s/state' % rid)
-            ret.append(state)
-
-        return ret
-
-
-    # --------------------------------------------------------------------------
-    #
-    def wait_resource_states(self, resource_ids=None, 
-                             states=None, timeout=None):
-        '''
-        wait for a specific (set of) states for all resources (ie. RP pilots)
-        with the given UIDs (or for all known resources if no UID is specified).
-        This call will return after a given timeout, or after the states have
-        been reached, whichever occurs first.  A negative timeout value will
-        cause it to wait forever.
-        '''
-
-        if not isinstance(states, list): states = [states]
+        if pids and len(pids) == 1 and pids[0]:
+            return self._query('get', '/sessions/%s/pilots/%s' % (sid, pids[0]))
         else:
-            pass
-          # raise NotImplementedError('can only wait for one state')
+            if pids: data = {'pids': pids}
+            else   : data = {}
+            return self._query('get', '/sessions/%s/pilots/' % sid, data)
 
-        state = states[0]
 
-        # FIXME: this is state model agnostic - passed states will never be
-        #        matched
-        if not resource_ids:
-            resource_ids = self.list_resources()
-        elif not isinstance(resource_ids, list):
-            resource_ids = [resource_ids]
+    # --------------------------------------------------------------------------
+    #
+    def pilots_wait(self, sid, pids=None, states=None, timeout=None):
+        '''
+        wait for a specific (set of) states for all pilots with the given UIDs
+        (or for all known resources if no UID is specified).  This call will
+        return after a given timeout, or after any of the given states have been
+        reached, whichever occurs first.  A negative timeout value will cause it
+        to wait forever.
+        '''
 
-        for rid in resource_ids:
+        data = {'pids'   : tolist(pids),
+                'states' : tolist(states),
+                'timeout': timeout}
 
-            self._query('get', '/resources/%s/wait/%s/%s' % (rid, state, timeout))
+        if pids and len(pids) == 1 and pids[0]:
+            self._query('post', '/sessions/%s/pilots/%s/' % (sid, pids[0]),
+                        data)
+        else:
+            self._query('post', '/sessions/%s/pilots/' % sid, data)
 
         return
 
 
     # --------------------------------------------------------------------------
     #
-    def cancel_resources(self, resource_ids=None):
+    def pilots_cancel(self, sid, pids=None):
         '''
         cancel all resources (ie. RP pilots) with the given UIDs (or for all
         known resources if no UID is specified).  This call will return when the
         resource states are final.
         '''
 
-        # FIXME: this is state model agnostic - passed states will never be
-        #        matched
-        if not resource_ids:
-            resource_ids = self.list_resources()
-        elif not isinstance(resource_ids, list):
-            resource_ids = [resource_ids]
-
-        for rid in resource_ids:
-
-            self._query('get', '/resources/%s/cancel' % (rid))
+        if pids and len(pids) == 1 and pids[0]:
+            self._query('delete', '/sessions/%s/pilots/%s' % (sid, pids[0]))
+        else:
+            data = {'pids': pids}
+            self._query('delete', '/sessions/%s/pilots/' % sid, data)
 
         return
 
 
     # --------------------------------------------------------------------------
     #
-    def submit_tasks(self, descriptions):
+    def tasks_submit(self, sid, descriptions):
         '''
         Harvester task descriptions are submitted to the RP level resources
         (pilots).
         '''
 
-        if   not descriptions                  : descriptions = list()
-        elif not isinstance(descriptions, list): descriptions = [descriptions]
+        if not descriptions:
+            return []
 
-        return self._query('put', '/tasks/', data=descriptions)
+        data = {'descriptions': tolist(descriptions)}
+
+        return self._query('put', '/sessions/%s/tasks/' % sid, data)
 
 
     # --------------------------------------------------------------------------
     #
-    def list_tasks(self):
+    def tasks_inspect(self, sid, tids=None):
         '''
         return UIDs for all known tasks (ie. RP units)
         '''
 
-        return self._query('get', '/tasks/')
-
-
-    # --------------------------------------------------------------------------
-    #
-    def get_task_states(self, task_ids=None):
-        '''
-        return states for the tasks (ie. RP units) with the given UIDs, or for
-        all tasks, if no UIDs are specified
-        '''
-
-        if task_ids:
-
-            if not isinstance(task_ids, list):
-                task_ids = [task_ids]
-
-            ret = list()
-            for tid in task_ids:
-                state = self._query('get', '/tasks/%s/state' % tid)
-                ret.append(state)
+        if tids and len(tids) == 1 and tids[0]:
+            return self._query('get', '/sessions/%s/tasks/%s' % (sid, tids[0]))
         else:
-            ret = self._query('get', '/tasks/state')
-
-        return ret
+            if tids: data = {'pids': tids}
+            else   : data = {}
+            return self._query('get', '/sessions/%s/tasks/' % sid, data)
 
 
     # --------------------------------------------------------------------------
     #
-    def wait_task_states(self, task_ids=None, states=None, timeout=None):
+    def tasks_wait(self, sid, tids=None, states=None, timeout=None):
         '''
         wait for a specific (set of) states for all tasks (ie. RP units)
         with the given UIDs (or for all known tasks if no UID is specified).
@@ -387,28 +281,18 @@ class NGE_RS(object):
         cause it to wait forever.
         '''
 
-        if not states:
-            state = ''
+        data = {'tids'   : tolist(tids),
+                'states' : tolist(states),
+                'timeout': timeout}
 
+        if tids and len(tids) == 1 and tids[0]:
+            self._query('post', '/sessions/%s/tasks/%s/' % (sid, tids[0]),
+                        data)
         else:
-            if not isinstance(states, list): states = [states]
-            else:
-                pass  # raise NotImplementedError('can only wait for one state')
-            state = states[0]
-
-        if not timeout:
-            # FIXME: we should do those conversions in `self._query`
-            timeout = '0'
-
-        if task_ids:
-            if not isinstance(task_ids, list):
-                task_ids = [task_ids]
-            for tid in task_ids:
-                self._query('get', '/tasks/%s/wait/%s/%s' % (tid, state, timeout))
-        else:
-            self._query('get', '/tasks/wait/%s/%s' % (state, timeout))
+            self._query('post', '/sessions/%s/tasks/' % sid, data)
 
         return
+
 
 
 # ------------------------------------------------------------------------------

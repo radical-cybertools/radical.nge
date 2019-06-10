@@ -24,93 +24,53 @@ if __name__ == '__main__':
     utime = 1    # sec
     psize = int(n * usize / ugen)
 
-    nge = None
-    sid = None
-    url = 'http://guest:guest@localhost:8090/'
+    sid   = 'foo.1'
+    url   = 'http://guest:guest@localhost:8090/'
 
-    try:
-        print 'connect'
-        nge = rn.NGE_RS(url=url, sid=sid)
+    nge = rn.NGE_RS(url=url)
 
-        print 'check_session'
-        sid = nge.session()
-        print 'sid: %s' % sid
+    print 'inspect sessions'
+    print nge.sessions_inspect()
 
-        print 'list_sessions'
-        print nge.list_sessions()
-        
-        sid = 'foo.1'
-        print 'start_session %s' % sid
-        nge.session(sid)
+    print 'login'
+    nge = rn.NGE_RS(url=url)
 
-        print 'check_session'
-        print 'sid: %s' % nge.session()
+    print 'inspect sessions'
+    print nge.sessions_inspect()
 
+    print 'create session'
+    nge.sessions_create(sid)
+    print 'sid: %s' % sid
 
-      # print 'request backfill resources'
-      # pprint.pprint(nge.request_backfill_resources(
-      #                                    {'resource' : 'ornl.titan_aprun',
-      #                                     'queue'    : 'debug',
-      #                                     'project'  : "CSC230"},
-      #                                    partition='titan',
-      #                                    policy='default'))
-      # print 'ok'
-      #
-      # print 'inspect resources'
-      # print nge.list_resources()
-      # print 'ok'
+    print 'inspect sessions'
+    print nge.sessions_inspect()
 
-        print 'request resources'
-        if tgt == 'titan':
-            print nge.request_resources([{'resource' : 'ornl.titan_aprun',
-                                          'queue'    : 'debug',
-                                          'project'  : 'BIP149',
-                                          'cores'    : psize + 16*1,  # agent nodes
-                                          'walltime' : 60}])
-        else:
-            print nge.request_resources([{'resource' : 'local.localhost',
-                                          'cores'    : 160,
-                                          'walltime' : 20}])
-        print 'ok'
+  # nge.pilots_submit(sid, 
+  #                   [{'type'     : 'backfill', 
+  #                   'resource' : 'ornl.titan_aprun',
+  #                   'queue'    : 'debug',
+  #                   'project'  : "CSC230", 
+  #                   'partition': titan',
+  #                   'policy'   : 'default'}])
+  #
+    print 'submit pilots (normal)'
+    if tgt == 'titan':
+        nge.pilots_submit(sid, 
+                          [{'resource' : 'ornl.titan_aprun',
+                            'queue'    : 'debug',
+                            'project'  : 'BIP149',
+                            'cores'    : psize + 16 * 1,
+                            'walltime' : 60}])
+    else:
+        nge.pilots_submit(sid, 
+                          [{'resource' : 'local.localhost',
+                            'cores'    : 160,
+                            'walltime' : 20}])
 
-#       print 'inspect resources'
-#       print nge.list_resources()
-#       print 'ok'
-#
-#       print 'find resources'
-#       print nge.find_resources()
-#       print 'ok'
-#
-#       print 'get_requested_resources'
-#       print nge.get_requested_resources()
-#       print 'ok'
-#
-#       print 'get_available_resources'
-#       print nge.get_available_resources()
-#       print 'ok'
-#
-#       print 'get_resource_info'
-#       print nge.get_resource_info()
-#       print 'ok'
-#
-#       print 'get_resource_states'
-#       print nge.get_resource_states()
-#       print 'ok'
-
-        print 'wait_resource_states'
-        print nge.wait_resource_states(states=rp.PMGR_ACTIVE)
-        print 'ok'
-
-        sys.exit(0)
-
-
-    finally:
-        if nge:
-            pass
-          # print 'logout'
-          # nge.logout()
-          # print 'ok'
-          # raise
+    print 'inspect pilots'
+    info = nge.pilots_inspect(sid)
+    for p in info:
+        print '%s: %s' % (p['uid'], p['state'])
 
 
 # ------------------------------------------------------------------------------
