@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-__copyright__ = 'Copyright 2017, http://radical.rutgers.edu'
+__copyright__ = 'Copyright 2017-19, http://radical.rutgers.edu'
 __license__   = 'MIT'
 
 
@@ -106,7 +106,7 @@ class NGE_Server(object):
     #
     def _serve(self):
         '''
-        Open service endpoint and begin serving requests
+        Open this service endpoint and begin serving requests
         '''
 
         routeapp(self)
@@ -130,10 +130,12 @@ class NGE_Server(object):
 
         # close all open sessions
         for account in self._accounts:
-            try:
-                self._stop_session(account)
-            except:
-                pass
+            for sid in account['sessions']:
+                try:
+                    account['sessions'][sid].close()
+                except:
+                    pass
+            account['sessions'] = dict()
 
 
     # --------------------------------------------------------------------------
@@ -322,21 +324,30 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
+    @methodroute('/sessions/',       method='DELETE')
     @methodroute('/sessions/<sid>/', method='DELETE')
-    def sessions_close(self, sid):
+    def sessions_close(self, sid=None):
         '''
         Close the session identified by `sid`.  This will terminate all pilots
-        and tasks started in this session.
+        and tasks started in this session.  If no SID is given, close all
+        sessions for this user.
         '''
 
         try:
             account = self._check_cookie(bottle.request)
 
-            if sid not in account['sessions']:
-                raise ValueError('session %s does not exist' % sid)
+            if sid:
+                # delete session with given ID
+                if sid not in account['sessions']:
+                    raise ValueError('session %s does not exist' % sid)
+                account['sessions'][sid].close()
+                del(account['sessions'][sid])
 
-            account['sessions'][sid].close()
-            del(account['sessions'][sid])
+            else:
+                # delete all of them
+                for sid in account['sessions']:
+                    account['sessions'][sid].close()
+                account['sessions'] = dict()
 
             return {'success' : True,
                     'result'  : None}

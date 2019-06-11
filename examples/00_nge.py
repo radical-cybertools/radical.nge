@@ -47,11 +47,11 @@ if __name__ == '__main__':
 
   # nge.pilots_submit(sid, 
   #                   [{'type'     : 'backfill', 
-  #                   'resource' : 'ornl.titan_aprun',
-  #                   'queue'    : 'debug',
-  #                   'project'  : "CSC230", 
-  #                   'partition': titan',
-  #                   'policy'   : 'default'}])
+  #                     'resource' : 'ornl.titan_aprun',
+  #                     'queue'    : 'debug',
+  #                     'project'  : "CSC230", 
+  #                     'partition': titan',
+  #                     'policy'   : 'default'}])
   #
     print 'submit pilots (normal)'
     if tgt == 'titan':
