@@ -13,16 +13,7 @@ tgt = 'local'
 #
 if __name__ == '__main__':
 
-    if len(sys.argv) > 1:
-        n = int(sys.argv[1])
-    else:
-        n = 32
-
-    unum  = n
-    ugen  = 2    # generations
-    usize = 4    # threads
-    utime = 1    # sec
-    psize = int(n * usize / ugen)
+    psize = 160
 
     sid   = 'foo.1'
     url   = 'http://guest:guest@localhost:8090/'

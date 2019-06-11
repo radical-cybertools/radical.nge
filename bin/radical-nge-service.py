@@ -129,13 +129,13 @@ class NGE_Server(object):
         '''
 
         # close all open sessions
-        for account in self._accounts:
-            for sid in account['sessions']:
+        for user in self._accounts:
+            for sid in self._accounts[user]['sessions']:
                 try:
-                    account['sessions'][sid].close()
+                    self._accounts[user]['sessions'][sid].close()
                 except:
                     pass
-            account['sessions'] = dict()
+            self._accounts[user]['sessions'] = dict()
 
 
     # --------------------------------------------------------------------------
@@ -366,6 +366,11 @@ class NGE_Server(object):
     #
     @methodroute('/sessions/<sid>/pilots/', method='PUT')
     def pilots_submit(self, sid):
+        '''
+        Submit a list of pilots.  This expectes a list of pilot descriptions as
+        json data.  Tyhe return value will be a list of pilot UIDs which can be
+        used to control the submitted pilot jobs.
+        '''
 
         try:
             account = self._check_cookie(bottle.request)
@@ -387,6 +392,9 @@ class NGE_Server(object):
     @methodroute('/sessions/<sid>/pilots/<pid>/', method='GET')
     @methodroute('/sessions/<sid>/pilots/',       method='GET')
     def pilots_inspect(self, sid, pid=None):
+        '''
+        This method will inspect one or multiple pilots, returning no
+        '''
 
         try:
             account = self._check_cookie(bottle.request)
@@ -473,9 +481,7 @@ class NGE_Server(object):
             session = self._get_session(account, sid)
             data    = json.loads(bottle.request.body.read())
 
-            tds = data['descriptions']
-
-            retval  = session.tasks_submit(tds)
+            retval  = session.tasks_submit(data['descriptions'])
 
             return {'success' : True,
                     'result'  : retval}
@@ -503,6 +509,46 @@ class NGE_Server(object):
                 tids = data.get('tids')
 
             retval = session.tasks_inspect(tids)
+
+            return {'success' : True,
+                    'result'  : retval}
+
+        except Exception as e:
+            self._log.exception('oops')
+            return {'success' : False,
+                    'error'   : repr(e)}
+
+
+    # --------------------------------------------------------------------------
+    #
+    @methodroute('/sessions/<sid>/tasks/<tid>/stdout', method='GET')
+    def tasks_stdout(self, sid, tid):
+
+        try:
+            account = self._check_cookie(bottle.request)
+            session = self._get_session(account, sid)
+
+            retval  = session.tasks_stdout(tid)
+
+            return {'success' : True,
+                    'result'  : retval}
+
+        except Exception as e:
+            self._log.exception('oops')
+            return {'success' : False,
+                    'error'   : repr(e)}
+
+
+    # --------------------------------------------------------------------------
+    #
+    @methodroute('/sessions/<sid>/tasks/<tid>/stderr', method='GET')
+    def tasks_stderr(self, sid, tid):
+
+        try:
+            account = self._check_cookie(bottle.request)
+            session = self._get_session(account, sid)
+
+            retval  = session.tasks_stderr(tid)
 
             return {'success' : True,
                     'result'  : retval}

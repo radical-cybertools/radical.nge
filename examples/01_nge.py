@@ -16,13 +16,12 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         n = int(sys.argv[1])
     else:
-        n = 32
+        n = 5
 
     unum  = n
     ugen  = 2    # generations
     usize = 4    # threads
     utime = 1    # sec
-    psize = int(n * usize / ugen)
 
     nge = None
     sid = 'foo.1'
@@ -55,21 +54,22 @@ if __name__ == '__main__':
     print 'submit tasks'
     tasks = list()
     for _ in range(unum):
-        tasks.append({'executable'       : '/bin/sleep',
-                      'arguments'        : [utime],
+        tasks.append({'executable'       : '/bin/date',
+                    # 'arguments'        : [utime],
                       'cpu_processes'    : 1,
                       'cpu_threads'      : usize,
                       'cpu_process_type' : rp.POSIX,
                       'cpu_thread_type'  : rp.POSIX,
-                      'pilot'            : None
+                      'pilot'            : None,
                     })
-    print nge.tasks_submit(sid, tasks)
+    tids = nge.tasks_submit(sid, tasks)
+    print tids
     print 'ok'
 
     print 'inspect tasks'
     info = nge.tasks_inspect(sid)
     for t in info:
-        print '%s: %s' % (t['uid'], t['state'])
+        print '%s: %s [%s]' % (t['uid'], t['state'], t['stdout'])
     print 'ok'
 
     print 'wait for task completion'
@@ -79,8 +79,17 @@ if __name__ == '__main__':
     print 'inspect tasks'
     info = nge.tasks_inspect(sid)
     for t in info:
-        print '%s: %s' % (t['uid'], t['state'])
+        print '%s: %s: %s' % (t['uid'], t['state'], t['stdout'])
     print 'ok'
+
+    print 'stdout for %s' % tids[0]
+    print nge.tasks_stdout(sid, tids[0])
+
+    try:
+        print 'stderr for %s' % tids[0]
+        print nge.tasks_stderr(sid, tids[0])
+    except Exception as e:
+        print e
 
     print 'cancel resources'
     print nge.pilots_cancel(sid)

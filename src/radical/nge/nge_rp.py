@@ -50,6 +50,16 @@ class NGE_RP(object):
 
         self._umgr.register_callback(self._unit_state_cb)
 
+        # create a dir for data staging
+        self._pwd  = os.getcwd()
+        self._data = 'data.%s' % self._session.uid
+        os.makedirs('%s/%s/'   % (self._pwd, self._data))
+
+
+        # track submitted tasks
+        self._tcnt  = 0
+        self._tasks = dict()
+
 
     # --------------------------------------------------------------------------
     #
@@ -226,10 +236,35 @@ class NGE_RP(object):
 
         self._rep.header('submit tasks\n')
         cuds = list()
+        orig = self._tcnt
         for descr in descriptions:
+            # ensure we stage stdout/stderr.  We don't have unit ID's yet, so we
+            # use a custom task ID to identify the output files.  Later versions
+            # of RP will allow :${RP_UNIT_ID}.
+            tid = 'task.%06d' % self._tcnt
+            self._tcnt += 1
+
+            tmp = [{'source': 'unit:///STDOUT',
+                    'target': 'client:///%s/%s.out' % (self._data, tid),
+                    'action': rp.TRANSFER},
+                   {'source': 'unit:///STDERR',
+                    'target': 'client:///%s/%s.err' % (self._data, tid),
+                    'action': rp.TRANSFER}]
+
+            if 'output_staging' in descr:
+                descr['output_staging'] += tmp
+            else:
+                descr['output_staging']  = tmp
+
             cuds.append(rp.ComputeUnitDescription(descr))
 
         units = self._umgr.submit_units(cuds)
+
+        self._tcnt = orig
+        for unit in units:
+            tid = 'task.%06d' % self._tcnt
+            self._tcnt += 1
+            self._tasks[unit.uid] = tid
 
         return [unit.uid for unit in units]
 
@@ -279,6 +314,40 @@ class NGE_RP(object):
             tinfo.append(task.as_dict())
 
         return tinfo
+
+
+    # --------------------------------------------------------------------------
+    #
+    def tasks_stdout(self, tid):
+
+        self._rep.info('\nget task stdout: %s\n' % tid)
+
+        if tid not in self._tasks:
+            raise ValueError('task ID is unknown')
+
+        fname = '%s/%s/%s.out' % (self._pwd, self._data, self._tasks[tid])
+
+        if not os.path.isfile(fname):
+            raise RuntimeError('stdout for %s is not available' % tid)
+
+        return open(fname, 'r').read()
+
+
+    # --------------------------------------------------------------------------
+    #
+    def tasks_stderr(self, tid):
+
+        self._rep.info('\nget task stderr: %s\n' % tid)
+
+        if tid not in self._tasks:
+            raise ValueError('task ID is unknown')
+
+        fname = '%s/%s/%s.err' % (self._pwd, self._data, self._tasks[tid])
+
+        if not os.path.isfile(fname):
+            raise RuntimeError('stderr for %s is not available' % tid)
+
+        return open(fname, 'r').read()
 
 
     # --------------------------------------------------------------------------

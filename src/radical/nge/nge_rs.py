@@ -137,8 +137,6 @@ class NGE_RS(object):
         already exists.
         '''
 
-        data = {'sid': sid}
-
         return self._query('put', '/sessions/%s/' % sid)
 
 
@@ -269,6 +267,26 @@ class NGE_RS(object):
 
     # --------------------------------------------------------------------------
     #
+    def tasks_stdout(self, sid, tid):
+        '''
+        return the stdout of a completed task
+        '''
+
+        return self._query('get', '/sessions/%s/tasks/%s/stdout' % (sid, tid))
+
+
+    # --------------------------------------------------------------------------
+    #
+    def tasks_stderr(self, sid, tid):
+        '''
+        return the stderr of a completed task
+        '''
+
+        return self._query('get', '/sessions/%s/tasks/%s/stderr' % (sid, tid))
+
+
+    # --------------------------------------------------------------------------
+    #
     def tasks_wait(self, sid, tids=None, states=None, timeout=None):
         '''
         wait for a specific (set of) states for all tasks (ie. RP units)
@@ -290,6 +308,20 @@ class NGE_RS(object):
 
         return
 
+
+    # --------------------------------------------------------------------------
+    #
+    def tasks_inspect(self, sid, tids=None):
+        '''
+        return UIDs for all known tasks (ie. RP units)
+        '''
+
+        if tids and len(tids) == 1 and tids[0]:
+            return self._query('get', '/sessions/%s/tasks/%s' % (sid, tids[0]))
+        else:
+            if tids: data = {'pids': tids}
+            else   : data = {}
+            return self._query('get', '/sessions/%s/tasks/' % sid, data)
 
 
 # ------------------------------------------------------------------------------
