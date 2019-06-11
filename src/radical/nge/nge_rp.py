@@ -48,6 +48,7 @@ class NGE_RP(object):
         self._pmgr    = rp.PilotManager(self._session)
         self._umgr    = rp.UnitManager(self._session)
 
+        self._pmgr.register_callback(self._pilot_state_cb)
         self._umgr.register_callback(self._unit_state_cb)
 
         # create a dir for data staging
@@ -271,6 +272,17 @@ class NGE_RP(object):
 
     # --------------------------------------------------------------------------
     #
+    def _pilot_state_cb(self, pilot, state):
+
+        if state in rp.FINAL:
+            self._rep.ok('pilot completed %s: %s\n' % (pilot.uid, pilot.state))
+            self._umgr.remove_pilots(pilot.uid)
+
+        return True
+
+
+    # --------------------------------------------------------------------------
+    #
     def _unit_state_cb(self, unit, state):
 
         # once the units are in final state, we can run the panda output staging
@@ -279,20 +291,12 @@ class NGE_RP(object):
         if state == rp.DONE:
             self._rep.ok('task completed %s\n' % unit.uid)
             pass
-            # FIXME: panda level output file staging goes here.
-            # FIXME: we need to make sure that PANDA is informed when our output
-            #        staging is done, and when the units can be controlled by
-            #        the panda layer again.  For that, we will set
-            #            'control': 'panda_pending'
-            #        in the unit dict returned to Panda on inspection, to signal
-            #        that control is relinguished.  Note that `DONE` is
-            #        insufficient, precisely because of the additional output
-            #        staging.
-            # NOTE:  can we translate the panda staging into proper RP staging
-            #        directives, to avoid explicit control management?
+            # FIXME: panda notification
         elif state == rp.FAILED:
             self._rep.error('task failed    %s\n' % unit.uid)
             pass
+
+        return True
 
 
     # --------------------------------------------------------------------------
