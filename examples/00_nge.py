@@ -36,33 +36,6 @@ if __name__ == '__main__':
     print 'inspect sessions'
     print nge.sessions_inspect()
 
-  # nge.pilots_submit(sid, 
-  #                   [{'type'     : 'backfill', 
-  #                     'resource' : 'ornl.titan_aprun',
-  #                     'queue'    : 'debug',
-  #                     'project'  : "CSC230", 
-  #                     'partition': titan',
-  #                     'policy'   : 'default'}])
-  #
-    print 'submit pilots (normal)'
-    if tgt == 'titan':
-        nge.pilots_submit(sid, 
-                          [{'resource' : 'ornl.titan_aprun',
-                            'queue'    : 'debug',
-                            'project'  : 'BIP149',
-                            'cores'    : psize + 16 * 1,
-                            'walltime' : 60}])
-    else:
-        nge.pilots_submit(sid, 
-                          [{'resource' : 'local.localhost',
-                            'cores'    : 160,
-                            'walltime' : 20}])
-
-    print 'inspect pilots'
-    info = nge.pilots_inspect(sid)
-    for p in info:
-        print '%s: %s' % (p['uid'], p['state'])
-
 
 # ------------------------------------------------------------------------------
 
