@@ -6,8 +6,8 @@ import time
 import radical.pilot as rp
 import radical.nge   as rn
 
-tgt = 'titan'
 tgt = 'local'
+tgt = 'titan'
 
 # ------------------------------------------------------------------------------
 #
@@ -43,9 +43,9 @@ if __name__ == '__main__':
     if tgt == 'titan':
         nge.pilots_submit(sid, 
                           [{'resource' : 'ornl.titan_aprun',
-                            'queue'    : 'debug',
+                            'queue'    : 'batch',
                             'project'  : 'BIP149',
-                            'cores'    : psize + 16 * 1,
+                            'cores'    : 32,
                             'walltime' : 20}])
     else:
         nge.pilots_submit(sid, 
