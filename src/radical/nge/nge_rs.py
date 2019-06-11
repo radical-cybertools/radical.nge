@@ -40,16 +40,13 @@ class NGE_RS(object):
         self._cookies        = list()
         self._url            = ru.Url(url)
 
+        self._qbase          = ru.Url(url)
+      # self._qbase.username = None
+      # self._qbase.password = None
+        self._qbase          = str(self._qbase).rstrip('/')
+
         if self._url.username and self._url.password:
             self.login(self._url.username, self._url.password)
-
-        self._qbase          = ru.Url(url)
-        self._qbase.username = ''
-        self._qbase.password = ''
-        self._qbase          = str(self._qbase)
-        self._qbase          = self._qbase.rstrip('/')
-
-        print '============ qbase: %s' % self._qbase
 
 
     # --------------------------------------------------------------------------
