@@ -16,7 +16,7 @@ if __name__ == '__main__':
     psize = 160
 
     sid   = 'foo.1'
-    url   = 'http://guest:guest@localhost:8090/'
+    url   = 'http://guest:guest@login1:8090/'
 
     nge = rn.NGE_RS(url=url)
 

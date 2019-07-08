@@ -7,7 +7,7 @@ import radical.pilot as rp
 import radical.nge   as rn
 
 tgt = 'local'
-tgt = 'titan'
+tgt = 'summit'
 
 # ------------------------------------------------------------------------------
 #
@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     nge = None
     sid = 'foo.1'
-    url = 'http://guest:guest@localhost:8090/'
+    url = 'http://guest:guest@login1:8090/'
 
     print 'connect'
     nge = rn.NGE_RS(url=url)
@@ -40,13 +40,13 @@ if __name__ == '__main__':
   #                     'policy'   : 'default'}])
   #
     print 'submit pilots (normal)'
-    if tgt == 'titan':
+    if tgt == 'summit':
         nge.pilots_submit(sid, 
-                          [{'resource' : 'ornl.titan_aprun',
+                          [{'resource' : 'ornl.summit_prte',
                             'queue'    : 'batch',
-                            'project'  : 'BIP149',
-                            'cores'    : 32,
-                            'walltime' : 20}])
+                            'project'  : 'GEO111',
+                            'cores'    : 42 * 4  * 4,
+                            'walltime' : 30}])
     else:
         nge.pilots_submit(sid, 
                           [{'resource' : 'local.localhost',

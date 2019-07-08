@@ -16,6 +16,8 @@ import bottle
 import radical.utils as ru
 import radical.nge   as rn
 
+os.environ['RADICAL_PILOT_DBURL'] = 'mongodb://nge:nge@two.radical-project.org/nge'
+
 
 # ------------------------------------------------------------------------------
 # https://stackoverflow.com/questions/8725605/
