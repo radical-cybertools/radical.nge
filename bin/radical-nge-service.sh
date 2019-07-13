@@ -1,4 +1,6 @@
 #!/bin/sh
 
-nohup radical-nge-service.py 2>&1 > radical-nge-service.log &
+export RADICAL_PILOT_DBURL=mongodb://nge:nge@two.radical-project.org/nge
+
+radical-nge-service.py 2>&1 > radical-nge-service.log &
 
