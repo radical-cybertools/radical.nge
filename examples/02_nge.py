@@ -24,7 +24,7 @@ if __name__ == '__main__':
 
     nge = None
     sid = 'foo.1'
-    url = 'http://guest:guest@localhost:8090/'
+    url = 'http://guest:guest@login1:8090/'
 
     print 'connect'
     nge = rn.NGE_RS(url=url)
