@@ -4,7 +4,7 @@ __copyright__ = 'Copyright 2017-19, http://radical.rutgers.edu'
 __license__   = 'MIT'
 
 
-# --------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 #
 # see https://docs.google.com/document/d/ \
 #                             1bm8ucgfi9SHjDy0w-ZX5NIdkjk87qFClMB9jMse75uM
@@ -16,7 +16,8 @@ import bottle
 import radical.utils as ru
 import radical.nge   as rn
 
-os.environ['RADICAL_PILOT_DBURL'] = 'mongodb://nge:nge@two.radical-project.org/nge'
+os.environ['RADICAL_PILOT_DBURL'] = \
+                                 'mongodb://nge:nge@two.radical-project.org/nge'
 
 
 # ------------------------------------------------------------------------------
@@ -97,7 +98,7 @@ class NGE_Server(object):
         self._accounts = {
                              'andre' : _Account('andre' , 'erdna' ),
                              'matteo': _Account('matteo', 'eottam'),
-                             'daniel': _Account('daniel', 'leinad'), 
+                             'daniel': _Account('daniel', 'leinad'),
                              'guest' : _Account('guest' , 'guest' ),
                          }
 
@@ -198,7 +199,7 @@ class NGE_Server(object):
         This expects json data of the form:
 
             {
-                 'username' : 'foo', 
+                 'username' : 'foo',
                  'password' : 'bar'
             }
 
@@ -247,7 +248,7 @@ class NGE_Server(object):
     def logout(self):
         '''
         This method will invalidate the session cookie, and all further
-        operations (apart from a new login) will cause an error.  
+        operations (apart from a new login) will cause an error.
 
         On logout, all sessions for the user will be closed, all pilots will be
         terminated.
@@ -306,22 +307,35 @@ class NGE_Server(object):
 
     # --------------------------------------------------------------------------
     #
-    @methodroute('/sessions/', method='GET')
-    def sessions_inspect(self):
+    @methodroute('/sessions/',       method='GET')
+    @methodroute('/sessions/<sid>/', method='GET')
+    def sessions_inspect(self, sid=None):
         '''
-        List all known session IDs for the current user
+        return a dict of session IDs and session UIDs to the user, for all or
+        the given session.
         '''
 
         try:
             account = self._check_cookie(bottle.request)
 
+            info = dict()
+            if sid:
+                if sid not in account['sessions']:
+                    raise ValueError('session %s does not exist' % sid)
+                info[sid] = account['sessions'][sid].uid
+
+            else:
+                for sid in  account['sessions']:
+                    info[sid] = account['sessions'][sid].uid
+
             return {'success' : True,
-                    'result'  : account['sessions'].keys()}
+                    'result'  : info}
 
         except Exception as e:
             self._log.exception('oops')
             return {'success' : False,
                     'error'   : repr(e)}
+
 
 
     # --------------------------------------------------------------------------

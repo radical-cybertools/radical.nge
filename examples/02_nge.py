@@ -24,7 +24,8 @@ if __name__ == '__main__':
 
     nge = None
     sid = 'foo.1'
-    url = 'http://guest:guest@login1:8090/'
+  # url = 'http://guest:guest@login1:8090/'
+    url = 'http://guest:guest@localhost:8090/'
 
     print 'connect'
     nge = rn.NGE_RS(url=url)
@@ -62,6 +63,8 @@ if __name__ == '__main__':
     print 'inspect tasks'
     info = nge.tasks_inspect(sid)
     for t in info:
+        import pprint
+        pprint.pprint(t)
         print '%s: %s: %s' % (t['uid'], t['state'], t['stdout'])
     print 'ok'
 
@@ -74,6 +77,7 @@ if __name__ == '__main__':
     except Exception as e:
         print e
 
+    nge.sessions_close(sid)
 
 # ------------------------------------------------------------------------------
 
